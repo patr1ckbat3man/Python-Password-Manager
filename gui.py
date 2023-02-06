@@ -1,10 +1,13 @@
 import secrets
+import os
 from string import ascii_letters, digits, punctuation
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import QIcon
 
-from db import MasterManip, DbManip
+from db import DbManip
+from master import MasterManip
 from constants import *
 
 class MasterPromptWindow(QWidget):
@@ -13,21 +16,27 @@ class MasterPromptWindow(QWidget):
 		self.setWindowTitle("Authentication")
 		self.setMinimumSize(QSize(650, 450))
 
+		self.hidden_icon = QIcon("icons/hidden.png")
+		self.shown_icon = QIcon("icons/shown.png")
+
 		self.master_handler = MasterManip()
 		self.label = QLabel(self)
 		self.entry = QLineEdit(self)
 		self.entry.setEchoMode(QLineEdit.Password)
-		self.visibility_button = QPushButton("Show", self)
-		auth_button = QPushButton("Auth", self)
-
-		auth_button.clicked.connect(self.auth_user)
+		self.visibility_button = QPushButton(self)
+		self.visibility_button.setFixedSize(25, 25)
+		self.visibility_button.setIcon(self.shown_icon)
+		self.visibility_button.setIconSize(QSize(19, 19))
 		self.visibility_button.clicked.connect(self.toggle_visibility)
 
+		auth_button = QPushButton("Auth", self)
+		auth_button.clicked.connect(self.auth_user)
+
 		master_grid = QGridLayout()
-		master_grid.addWidget(self.label, 0, 0)
-		master_grid.addWidget(self.entry, 1, 0)
+		master_grid.addWidget(self.label, 0, 0, 1, 1)
+		master_grid.addWidget(self.entry, 1, 0, 1, 1)
 		master_grid.addWidget(self.visibility_button, 1, 1)
-		master_grid.addWidget(auth_button, 2, 0, 1, 2)
+		master_grid.addWidget(auth_button, 2, 0, 1, 1)
 		master_grid.setAlignment(Qt.AlignCenter)
 
 		self.setLayout(master_grid)
@@ -35,15 +44,15 @@ class MasterPromptWindow(QWidget):
 
 	def auth_user(self):
 		storage_window = StorageWindow()
-		key = self.entry.text()
+		key = self.entry.text().encode()
 		self.entry.clear()
 
-		if not self.master_handler.master_exists():
-			self.master_handler.write_key(key.encode())
+		if not os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
+			self.master_handler.write_key(key)
 			self.close()
 			storage_window.show()
 		else:
-			if self.master_handler.verify_key(key.encode()):
+			if self.master_handler.verify_key(key):
 				self.close()
 				storage_window.show()
 			else:
@@ -51,16 +60,18 @@ class MasterPromptWindow(QWidget):
 
 	def toggle_visibility(self):
 		if self.entry.echoMode() == QLineEdit.Password:
+			self.visibility_button.setIcon(self.shown_icon)
 			self.entry.setEchoMode(QLineEdit.Normal)
-			self.visibility_button.setText("Hide")
 		else:
+			self.visibility_button.setIcon(self.hidden_icon)
 			self.entry.setEchoMode(QLineEdit.Password)
-			self.visibility_button.setText("Show")
+		self.visibility_button.update()	
 
 	def config_label(self):
-		if not self.master_handler.master_exists():
+		if os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
+			self.label.setText(f"Enter master key for {DB_FOLDER}/{DB_STORAGE}")
+		else:
 			self.label.setText(f"Create master key")
-		self.label.setText(f"Enter master key for {DB_FOLDER}/{DB_STORAGE}")
 
 class StorageWindow(QMainWindow):
     def __init__(self):
@@ -80,13 +91,14 @@ class StorageWindow(QMainWindow):
         self.search_entry = QLineEdit(central_widget)
         self.search_entry.setVisible(False)
 
-        self.delete_button = QPushButton("Delete entry", central_widget)
-
         self.search_by = QLabel("Search by", central_widget)
         self.search_by.setVisible(False)
 
         self.enter_button = QPushButton("Enter", central_widget)
         self.enter_button.setVisible(False)
+
+        self.cancel_button = QPushButton("Cancel", central_widget)
+        self.cancel_button.setVisible(False)
 
         self.combo = QComboBox(central_widget)
         self.combo.addItem("Title")
@@ -97,14 +109,48 @@ class StorageWindow(QMainWindow):
         self.storage_grid = QGridLayout(central_widget)
         self.storage_grid.addWidget(self.add_button, 0, 0)
         self.storage_grid.addWidget(self.search_button, 0, 1)
-       	self.storage_grid.addWidget(self.delete_button, 0, 2)
 
        	self.add_button.clicked.connect(self.data_window.show)
         self.search_button.clicked.connect(self.toggle_widgets)
-        self.delete_button.clicked.connect(self.toggle_widgets)
-        self.enter_button.clicked.connect(self.show_entry)
+        self.enter_button.clicked.connect(self.search)
+        self.cancel_button.clicked.connect(self.cancel_search)
 
         self.storage_grid.setAlignment(Qt.AlignCenter)
+
+    def search(self):
+    	filter_by = self.combo.currentText()
+    	value = self.search_entry.text()
+    	if not self.storage_handler.table_exists():
+    		QMessageBox.critical(self, "Error!", "No table to search data from!")
+    		self.search_entry.clear()
+    	else:
+	    	if not self.storage_handler.entry_exists(filter_by, value):
+	    		QMessageBox.critical(self, "Error!", f"No such entry containing {value} in {filter_by} column.")
+	    		self.search_entry.clear()
+	    	else:
+	    		print("containing.")
+
+    def closeEvent(self, event):
+    	reply = QMessageBox.question(self, "Quit?", "Are you sure you want to quit?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+    	if reply == QMessageBox.Yes:
+    		self.storage_handler.close()
+    		event.accept()
+    	else:
+    		event.ignore()
+
+    def cancel_search(self):
+    	if self.search_by.isVisible() and self.combo.isVisible() \
+    		and self.search_entry.isVisible() and self.enter_button.isVisible() \
+    		and self.cancel_button.isVisible():
+    		self.search_by.setVisible(False)
+    		self.combo.setVisible(False)
+    		self.search_entry.setVisible(False)
+    		self.enter_button.setVisible(False)
+    		self.cancel_button.setVisible(False)
+    		self.add_button.setVisible(True)
+    		self.search_button.setVisible(True)
+
 
     def toggle_widgets(self):
     	if self.search_entry.isVisible() and self.combo.isVisible():
@@ -116,34 +162,15 @@ class StorageWindow(QMainWindow):
     		self.combo.setVisible(True)
     		self.search_entry.setVisible(True)
     		self.enter_button.setVisible(True)
+    		self.cancel_button.setVisible(True)
     		self.add_button.setVisible(False)
     		self.search_button.setVisible(False)
-    		self.delete_button.setVisible(False)
 
-    		self.storage_grid.addWidget(self.search_by, 1, 0)
-    		self.storage_grid.addWidget(self.combo, 1, 1)
-    		self.storage_grid.addWidget(self.search_entry, 1, 2)
-    		self.storage_grid.addWidget(self.enter_button, 1, 3)
-
-    def show_entry(self):
-    	filter_by = self.combo.currentText()
-    	value = self.search_entry.text()
-    	if not self.storage_handler.entry_exists(filter_by, value):
-    		QMessageBox.critical(self, "Error!", f"No such entry containing {value} in {filter_by} column.")
-    	else:
-    		print("containing.")
-
-    def delete_entry(self):
-    	pass
-
-    def closeEvent(self, event):
-    	reply = QMessageBox.question(self, "Quit?", "Are you sure you want to quit?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-
-    	if reply == QMessageBox.Yes:
-    		self.storage_handler.close()
-    		event.accept()
-    	else:
-    		event.ignore()
+    		self.storage_grid.addWidget(self.search_by, 1, 0, 1, 1)
+    		self.storage_grid.addWidget(self.combo, 1, 1, 1, 1)
+    		self.storage_grid.addWidget(self.search_entry, 2, 0, 1, 2)
+    		self.storage_grid.addWidget(self.enter_button, 3, 0, 1, 1)
+    		self.storage_grid.addWidget(self.cancel_button, 3, 1, 1, 1)    		
 
 class AddDataWindow(QWidget):
 	def __init__(self, parent, obj):
@@ -168,8 +195,11 @@ class AddDataWindow(QWidget):
 		self.repeat_password_entry = QLineEdit(self)
 		self.repeat_password_entry.setEchoMode(QLineEdit.Password)
 
-		self.generate_password_button = QPushButton("Generate password", self)
-		self.visibility_button = QPushButton("Show", self)
+		self.generate_password_button = QPushButton("Generate", self)
+		self.visibility_button = QPushButton("", self)
+		self.visibility_button.setFixedSize(25, 25)
+		self.visibility_button.setIcon(QIcon("shown.png"))
+		self.visibility_button.setIconSize(QSize(19, 19))
 		self.spin_box = QSpinBox(self)
 		self.spin_box.setRange(1, 64)
 		self.spin_box.setValue(16)
@@ -244,14 +274,15 @@ class AddDataWindow(QWidget):
 		self.repeat_password_entry.setText(generated_password)
 
 	def toggle_visibility(self):
-		if self.password_entry.echoMode() == QLineEdit.Password and self.repeat_password_entry.echoMode() == QLineEdit.Password:
+		if self.password_entry.echoMode() == QLineEdit.Password \
+		and self.repeat_password_entry.echoMode() == QLineEdit.Password:
 			self.password_entry.setEchoMode(QLineEdit.Normal)
 			self.repeat_password_entry.setEchoMode(QLineEdit.Normal)
-			self.visibility_button.setText("Hide")
+			self.visibility_button.setIcon(QIcon("shown.png"))
 		else:
 			self.password_entry.setEchoMode(QLineEdit.Password)
 			self.repeat_password_entry.setEchoMode(QLineEdit.Password)
-			self.visibility_button.setText("Show")
+			self.visibility_button.setIcon(QIcon("hidden.png"))
 
 	@staticmethod
 	def generate_password(length):
