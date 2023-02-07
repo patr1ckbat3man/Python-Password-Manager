@@ -14,29 +14,35 @@ class MasterPromptWindow(QWidget):
 	def __init__(self):
 		super().__init__()
 		self.setWindowTitle("Authentication")
-		self.setMinimumSize(QSize(650, 450))
+		self.setMinimumSize(QSize(650, 400))
+
+		self.master_handler = MasterManip()
 
 		self.hidden_icon = QIcon("icons/hidden.png")
 		self.shown_icon = QIcon("icons/shown.png")
 
-		self.master_handler = MasterManip()
 		self.label = QLabel(self)
 		self.entry = QLineEdit(self)
 		self.entry.setEchoMode(QLineEdit.Password)
+
 		self.visibility_button = QPushButton(self)
-		self.visibility_button.setFixedSize(25, 25)
-		self.visibility_button.setIcon(self.shown_icon)
+		self.visibility_button.setIcon(self.hidden_icon)
 		self.visibility_button.setIconSize(QSize(19, 19))
+		self.visibility_button.setFixedSize(25, 25)
 		self.visibility_button.clicked.connect(self.toggle_visibility)
 
 		auth_button = QPushButton("Auth", self)
 		auth_button.clicked.connect(self.auth_user)
 
+		exit_button = QPushButton("Exit", self)
+		exit_button.clicked.connect(QApplication.quit)
+
 		master_grid = QGridLayout()
-		master_grid.addWidget(self.label, 0, 0, 1, 1)
-		master_grid.addWidget(self.entry, 1, 0, 1, 1)
-		master_grid.addWidget(self.visibility_button, 1, 1)
-		master_grid.addWidget(auth_button, 2, 0, 1, 1)
+		master_grid.addWidget(self.label, 0, 0)
+		master_grid.addWidget(self.entry, 1, 0, 1, 2)
+		master_grid.addWidget(self.visibility_button, 1, 2)
+		master_grid.addWidget(auth_button, 2, 0)
+		master_grid.addWidget(exit_button, 2, 1)
 		master_grid.setAlignment(Qt.AlignCenter)
 
 		self.setLayout(master_grid)
@@ -64,8 +70,7 @@ class MasterPromptWindow(QWidget):
 			self.entry.setEchoMode(QLineEdit.Normal)
 		else:
 			self.visibility_button.setIcon(self.hidden_icon)
-			self.entry.setEchoMode(QLineEdit.Password)
-		self.visibility_button.update()	
+			self.entry.setEchoMode(QLineEdit.Password)	
 
 	def config_label(self):
 		if os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
@@ -181,6 +186,9 @@ class AddDataWindow(QWidget):
 		self.parent = parent
 		self.storage_handler = obj
 
+		self.hidden_icon = QIcon("icons/hidden.png")
+		self.shown_icon = QIcon("icons/shown.png")
+
 		self.title_label = QLabel("Title:", self)
 		self.title_entry = QLineEdit(self)
 
@@ -196,10 +204,10 @@ class AddDataWindow(QWidget):
 		self.repeat_password_entry.setEchoMode(QLineEdit.Password)
 
 		self.generate_password_button = QPushButton("Generate", self)
-		self.visibility_button = QPushButton("", self)
-		self.visibility_button.setFixedSize(25, 25)
-		self.visibility_button.setIcon(QIcon("shown.png"))
+		self.visibility_button = QPushButton(self)
+		self.visibility_button.setIcon(self.hidden_icon)
 		self.visibility_button.setIconSize(QSize(19, 19))
+		self.visibility_button.setFixedSize(25, 25)
 		self.spin_box = QSpinBox(self)
 		self.spin_box.setRange(1, 64)
 		self.spin_box.setValue(16)
@@ -278,11 +286,11 @@ class AddDataWindow(QWidget):
 		and self.repeat_password_entry.echoMode() == QLineEdit.Password:
 			self.password_entry.setEchoMode(QLineEdit.Normal)
 			self.repeat_password_entry.setEchoMode(QLineEdit.Normal)
-			self.visibility_button.setIcon(QIcon("shown.png"))
+			self.visibility_button.setIcon(self.shown_icon)
 		else:
 			self.password_entry.setEchoMode(QLineEdit.Password)
 			self.repeat_password_entry.setEchoMode(QLineEdit.Password)
-			self.visibility_button.setIcon(QIcon("hidden.png"))
+			self.visibility_button.setIcon(self.hidden_icon)
 
 	@staticmethod
 	def generate_password(length):
