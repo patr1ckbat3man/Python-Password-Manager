@@ -6,7 +6,7 @@ from constants import *
 class DbManip(object):
 	def __init__(self):
 		if not os.path.exists(f"{DB_FOLDER}/{DB_STORAGE}"):
-			open(f"{DB_FOLDER}/{DB_STORAGE}", "a").close()
+			open(f"{DB_FOLDER}/{DB_STORAGE}", "w").close()
 		self.connection = sqlite3.connect(f"{DB_FOLDER}/{DB_STORAGE}")
 		self.cursor = self.connection.cursor()
 
@@ -31,18 +31,18 @@ class DbManip(object):
 
 	def entry_exists(self, filter_by, value):
 		if filter_by not in ["Title", "URL", "Username"]:
-			return False
+			return (False, [])
 
 		try:
 			self.cursor.execute(f"select * from storage WHERE {filter_by}=?", (value,))
 			result = self.cursor.fetchall()
 		except sqlite3.OperationalError:
-			return False
+			return (False, [])
+
+		if result:
+			return (True, result)
 		else:
-			if result:
-				return True
-			else:
-				return False
+			return (False, [])
 
 	def add(self, **kwargs):
 		columns = ", ".join(kwargs.keys())
