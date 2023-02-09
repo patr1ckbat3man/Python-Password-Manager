@@ -1,10 +1,24 @@
+import os
+import sys
 
+sys.path.append(os.path.abspath(".."))
+
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QGridLayout, QMessageBox
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QSize
+
+import utils.mastermanip as mastermanip
+from .storage import StorageWindow
+from constants import *
 
 class MasterWindow(QWidget):
 	def __init__(self):
 		super().__init__()
+				
+		if not os.path.exists(f"{DB_FOLDER}"):
+			os.mkdir(f"{DB_FOLDER}")
+
 		self.initUI()
-		self.master_handler = MasterManip()
 
 	def initUI(self):
 		self.hidden_icon = QIcon("icons/hidden.png")
@@ -17,12 +31,11 @@ class MasterWindow(QWidget):
 		self.visibility_button.setIcon(self.hidden_icon)
 		self.visibility_button.setIconSize(QSize(19, 19))
 		self.visibility_button.setFixedSize(25, 25)
-		self.visibility_button.clicked.connect(self.toggle_visibility)
-
 		auth_button = QPushButton("Auth", self)
-		auth_button.clicked.connect(self.auth_user)
-
 		exit_button = QPushButton("Exit", self)
+
+		self.visibility_button.clicked.connect(self.toggle_visibility)
+		auth_button.clicked.connect(self.auth_user)
 		exit_button.clicked.connect(QApplication.quit)
 
 		master_grid = QGridLayout()
@@ -34,24 +47,23 @@ class MasterWindow(QWidget):
 		master_grid.setAlignment(Qt.AlignCenter)
 
 		self.config_label()
-
 		self.setLayout(master_grid)
 		self.setWindowTitle("Authentication")
 		self.setMinimumSize(QSize(650, 400))
+		self.show()
 
 	def auth_user(self):
-		storage_window = StorageWindow()
 		key = self.entry.text().encode()
 		self.entry.clear()
 
 		if not os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
-			self.master_handler.write_key(key)
+			mastermanip.write_key(key)
 			self.close()
-			storage_window.show()
+			StorageWindow(self).show()
 		else:
-			if self.master_handler.verify_key(key):
+			if mastermanip.verify_key(key):
 				self.close()
-				storage_window.show()
+				StorageWindow(self).show()
 			else:
 				QMessageBox.critical(self, "Error!", "Sorry, the password you entered is incorrect or the file you are trying to access is either corrupt or doesn't exist.")
 

@@ -5,31 +5,25 @@ import bcrypt
 
 from constants import *
 
-class MasterManip(object):
-	def __init__(self):
-		if not os.path.exists(DB_FOLDER):
-			os.mkdir(DB_FOLDER)
+def verify_key(key):
+	salt = bcrypt.gensalt()
 
-	def verify_key(self, key):
-		salt = bcrypt.gensalt()
-		master_hash = bcrypt.hashpw(key, salt)
-
-		try:
-			with open(f"{DB_FOLDER}/{DB_MASTER}", "r") as f:
-				master_data = json.load(f)
-				master_hash = master_data["hash"]
-		except Exception:
-			return False
+	try:
+		with open(f"{DB_FOLDER}/{DB_MASTER}", "r") as f:
+			content = json.load(f)
+			stored_hash = content["hash"]
+	except Exception:
+		return False
+	else:
+		if bcrypt.checkpw(key, stored_hash.encode()):
+			return True
 		else:
-			if bcrypt.checkpw(key, master_hash.encode()):
-				return True
-			else:
-				return False
+			return False
 
-	def write_key(self, key):
-		salt = bcrypt.gensalt()
-		master_hash = bcrypt.hashpw(key, salt)
-		master_data = {"hash": master_hash.decode()}
+def write_key(key):
+	salt = bcrypt.gensalt()
+	key_hash = bcrypt.hashpw(key, salt)
+	content = {"hash": key_hash.decode()}
 
-		with open(f"{DB_FOLDER}/{DB_MASTER}", "w") as f:
-			json.dump(master_data, f, indent=4)
+	with open(f"{DB_FOLDER}/{DB_MASTER}", "w") as f:
+		json.dump(content, f)

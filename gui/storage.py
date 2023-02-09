@@ -1,12 +1,23 @@
+import os
+import sys
 
+sys.path.append(os.path.abspath(".."))
+
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QGridLayout, QLabel, QComboBox, QLineEdit, QPushButton, QMessageBox, QVBoxLayout, QScrollArea, QFrame
+from PyQt5.QtCore import Qt, QSize
+
+import utils.storagemanip as storagemanip
+from .data import AddDataWindow
+from constants import *
 
 class StorageWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.storage_handler = storagemanip.DbManip()
+        self.data_window = AddDataWindow(self, self.storage_handler)
+
         self.initUI()
         """
-        self.storage_handler = DbManip()
-        self.data_window = AddDataWindow(self, self.storage_handler)
 
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
@@ -64,10 +75,8 @@ class StorageWindow(QMainWindow):
     	self.setWindowTitle("Storage")
     	self.setMinimumSize(QSize(750, 500))
     	self.show()
-    	return
 
     def search(self):
-    	self.frames = []
     	filter_by = self.combo.currentText()
     	value = self.search_entry.text()
     	if not self.storage_handler.table_exists():
@@ -81,21 +90,21 @@ class StorageWindow(QMainWindow):
 	    	else:
 	    		if len(result[1]) == 1:
 	    			frame = EntryFrame(title=result[1][0][0], username=result[1][0][1], password=result[1][0][2], url=result[1][0][3])
-	    			self.frames.append(frame)
 	    			self.storage_grid.addWidget(frame, 4, 1)
 	    		else:
 	    			row = 4
 	    			for i in range(len(result[1])):
 	    				#print(result[1][i])
 	    				frame = EntryFrame(title=result[1][i][0], username=result[1][i][1], password=result[1][i][2], url=result[1][i][3])
-	    				self.frames.append(frame)
 	    				self.storage_grid.addWidget(frame, row, 1)
 	    				row += 1
 
     def cancel_search(self):
-    	if self.search_by.isVisible() and self.combo.isVisible() \
-    		and self.search_entry.isVisible() and self.enter_button.isVisible() \
-    		and self.cancel_button.isVisible():
+    	if self.search_by.isVisible() and \
+        self.combo.isVisible() and \
+        self.search_entry.isVisible() and \
+        self.enter_button.isVisible() and \
+        self.cancel_button.isVisible():
     		self.search_by.setVisible(False)
     		self.combo.setVisible(False)
     		self.search_entry.setVisible(False)
@@ -103,11 +112,10 @@ class StorageWindow(QMainWindow):
     		self.cancel_button.setVisible(False)
     		self.add_button.setVisible(True)
     		self.search_button.setVisible(True)
-    		for f in self.frames:
-    			f.setVisible(False)
 
     def toggle_widgets(self):
-    	if self.search_entry.isVisible() and self.combo.isVisible():
+    	if self.search_entry.isVisible() and \
+        self.combo.isVisible():
     		self.search_by.setVisible(False)
     		self.combo.setVisible(False)
     		self.search_entry.setVisible(False)

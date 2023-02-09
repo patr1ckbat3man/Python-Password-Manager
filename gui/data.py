@@ -1,14 +1,19 @@
+import secrets
+from string import ascii_letters, digits, punctuation
 
+from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QSpinBox, QGridLayout, QMessageBox
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QSize
 
 class AddDataWindow(QWidget):
-	def __init__(self, parent, obj):
+	def __init__(self, parent=None, obj=None):
 		super().__init__()
-		self.setWindowTitle("Add entry")
-		self.setMinimumSize(QSize(650, 450))
-
 		self.parent = parent
 		self.storage_handler = obj
 
+		self.initUI()
+
+	def initUI(self):
 		self.hidden_icon = QIcon("icons/hidden.png")
 		self.shown_icon = QIcon("icons/shown.png")
 		self.dice_icon = QIcon("icons/dice.png")
@@ -68,9 +73,8 @@ class AddDataWindow(QWidget):
 
 		self.setLayout(grid)
 		grid.setAlignment(Qt.AlignCenter)
-
-	def initUI(self):
-		pass
+		self.setWindowTitle("Add entry")
+		self.setMinimumSize(QSize(650, 450))
 
 	def validate_entry(self):
 		title = self.title_entry.text()
