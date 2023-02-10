@@ -3,7 +3,15 @@ import sys
 
 sys.path.append(os.path.abspath(".."))
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import (
+	QApplication, 
+	QWidget, 
+	QLabel, 
+	QLineEdit, 
+	QPushButton, 
+	QGridLayout, 
+	QMessageBox
+)
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QSize
 
@@ -18,64 +26,67 @@ class MasterWindow(QWidget):
 		if not os.path.exists(f"{DB_FOLDER}"):
 			os.mkdir(f"{DB_FOLDER}")
 
-		self.initUI()
-
-	def initUI(self):
 		self.hidden_icon = QIcon("icons/hidden.png")
 		self.shown_icon = QIcon("icons/shown.png")
 
-		self.label = QLabel(self)
-		self.entry = QLineEdit(self)
+		widget = QWidget(self)
+		layout = QGridLayout()
+		self.label = QLabel()
+		self.entry = QLineEdit()
 		self.entry.setEchoMode(QLineEdit.Password)
-		self.visibility_button = QPushButton(self)
-		self.visibility_button.setIcon(self.hidden_icon)
-		self.visibility_button.setIconSize(QSize(19, 19))
-		self.visibility_button.setFixedSize(25, 25)
-		auth_button = QPushButton("Auth", self)
-		exit_button = QPushButton("Exit", self)
+		self.toggle_button = QPushButton()
+		self.toggle_button.setIcon(self.hidden_icon)
+		self.toggle_button.setIconSize(QSize(19, 19))
+		self.toggle_button.setFixedSize(25, 25)
+		auth_button = QPushButton("Auth")
+		exit_button = QPushButton("Exit")
 
-		self.visibility_button.clicked.connect(self.toggle_visibility)
-		auth_button.clicked.connect(self.auth_user)
+		self.toggle_button.clicked.connect(self.toggle)
+		auth_button.clicked.connect(self.auth)
 		exit_button.clicked.connect(QApplication.quit)
 
-		master_grid = QGridLayout()
-		master_grid.addWidget(self.label, 0, 0)
-		master_grid.addWidget(self.entry, 1, 0, 1, 2)
-		master_grid.addWidget(self.visibility_button, 1, 2)
-		master_grid.addWidget(auth_button, 2, 0)
-		master_grid.addWidget(exit_button, 2, 1)
-		master_grid.setAlignment(Qt.AlignCenter)
+		layout.addWidget(self.label, 0, 0)
+		layout.addWidget(self.entry, 1, 0, 1, 2)
+		layout.addWidget(self.toggle_button, 1, 2)
+		layout.addWidget(auth_button, 2, 0)
+		layout.addWidget(exit_button, 2, 1)
+		layout.setAlignment(Qt.AlignCenter)
+		widget.setLayout(layout)
 
-		self.config_label()
-		self.setLayout(master_grid)
+		self.config()
+		self.setLayout(layout)
 		self.setWindowTitle("Authentication")
 		self.setMinimumSize(QSize(650, 400))
 		self.show()
 
-	def auth_user(self):
+	def auth(self):
 		key = self.entry.text().encode()
 		self.entry.clear()
+
+		if not key:
+			QMessageBox.critical(self, "Error!", "Please enter a password.")
+			return
 
 		if not os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
 			mastermanip.write_key(key)
 			self.close()
-			StorageWindow(self).show()
+			StorageWindow().show()
 		else:
 			if mastermanip.verify_key(key):
 				self.close()
-				StorageWindow(self).show()
+				StorageWindow().show()
 			else:
 				QMessageBox.critical(self, "Error!", "Sorry, the password you entered is incorrect or the file you are trying to access is either corrupt or doesn't exist.")
 
-	def toggle_visibility(self):
+	def toggle(self):
 		if self.entry.echoMode() == QLineEdit.Password:
-			self.visibility_button.setIcon(self.shown_icon)
+			self.toggle_button.setIcon(self.shown_icon)
 			self.entry.setEchoMode(QLineEdit.Normal)
 		else:
-			self.visibility_button.setIcon(self.hidden_icon)
+			self.toggle_button.setIcon(self.hidden_icon)
 			self.entry.setEchoMode(QLineEdit.Password)	
 
-	def config_label(self):
+	def config(self):
 		if os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
 			self.label.setText(f"Enter master key for {DB_FOLDER}/{DB_STORAGE}")
 		else:

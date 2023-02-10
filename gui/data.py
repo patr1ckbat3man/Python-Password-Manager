@@ -1,7 +1,15 @@
 import secrets
 from string import ascii_letters, digits, punctuation
 
-from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QPushButton, QSpinBox, QGridLayout, QMessageBox
+from PyQt5.QtWidgets import (
+	QWidget, 
+	QLabel, 
+	QLineEdit, 
+	QPushButton, 
+	QSpinBox, 
+	QGridLayout, 
+	QMessageBox
+)
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QSize
 
@@ -11,9 +19,6 @@ class AddDataWindow(QWidget):
 		self.parent = parent
 		self.storage_handler = obj
 
-		self.initUI()
-
-	def initUI(self):
 		self.hidden_icon = QIcon("icons/hidden.png")
 		self.shown_icon = QIcon("icons/shown.png")
 		self.dice_icon = QIcon("icons/dice.png")
