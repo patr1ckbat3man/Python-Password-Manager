@@ -1,5 +1,6 @@
 import os
 import sys
+import hashlib
 
 sys.path.append(os.path.abspath(".."))
 
@@ -70,11 +71,11 @@ class MasterWindow(QWidget):
 		if not os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
 			mastermanip.write_key(key)
 			self.close()
-			StorageWindow().show()
+			StorageWindow(hashlib.sha256(key).digest()).show()
 		else:
 			if mastermanip.verify_key(key):
 				self.close()
-				StorageWindow().show()
+				StorageWindow(hashlib.sha256(key).digest()).show()
 			else:
 				QMessageBox.critical(self, "Error!", "Sorry, the password you entered is incorrect or the file you are trying to access is either corrupt or doesn't exist.")
 

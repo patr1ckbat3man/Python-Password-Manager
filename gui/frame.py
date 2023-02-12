@@ -1,37 +1,52 @@
+import pyperclip
 from PyQt5.QtWidgets import (
     QFrame,
     QPushButton,
     QLabel,
-    QGridLayout,
+    QHBoxLayout,
+    QMenu,
+    QAction
 )
+from PyQt5.QtCore import Qt
 
 class Frame(QFrame):
-    def __init__(self, **kwargs):
+    def __init__(self, title, username, password, url):
         super().__init__()
-        self.kwargs = kwargs
 
-        self.delete_button = QPushButton("Delete", self)
-        self.edit_button = QPushButton("Edit", self)
+        self._title = title
+        self._username = username
+        self._password = password
+        self._url = url
+        self.title_label = QLabel(self._title, self)
 
-        self.setStyleSheet("QFrame {border: 1px solid #7f7f7f; padding: 3px;}")
-
-        for k, v in self.kwargs.items():
-            setattr(self, k, v)
-
-        self.layout = QGridLayout()
+        self.setStyleSheet("QFrame {border: 1px solid #7f7f7f;}")
+        self.layout = QHBoxLayout()
+        self.layout.addWidget(self.title_label)
         self.setLayout(self.layout)
-        self.create_widgets()
 
-    def create_widgets(self):
-        row = 0
-        for k, v in self.kwargs.items():
-            label = QLabel(k)
-            value = QLabel(v)
-            self.layout.addWidget(label, row, 0)
-            self.layout.addWidget(value, row, 1)
-            row += 1
-        self.layout.addWidget(self.delete_button, row+1, 0)
-        self.layout.addWidget(self.edit_button, row+1, 1)
+    def copy_title(self):
+        pyperclip.copy(self._title)
+
+    def copy_username(self):
+        pyperclip.copy(self._username)
+
+    def copy_password(self):
+        pyperclip.copy(self._password)
+
+    def copy_url(self):
+        pyperclip.copy(self._url)
+
+    def copy_title(self):
+        pyperclip.copy(self._title)
+
+    def copy_username(self):
+        pyperclip.copy(self._username)
+
+    def copy_password(self):
+        pyperclip.copy(self._password)
+
+    def copy_url(self):
+        pyperclip.copy(self._url)
 
     def edit(self):
         pass

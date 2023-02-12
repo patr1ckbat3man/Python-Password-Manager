@@ -24,12 +24,13 @@ from .frame import Frame
 from constants import *
 
 class StorageWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, master_key):
         super().__init__()
-        self.storage_handler = storagemanip.DbManip()
+        self.master_key = master_key
+        self.storage_handler = storagemanip.DbManip(self.master_key)
         self.data_window = AddDataWindow(self, self.storage_handler)
 
-        widget = QWidget(self)
+        self.widget = QWidget(self)
         self.layout = QGridLayout()
         self.add_button = QPushButton("Add entry")
         self.search_button = QPushButton("Search entry")
@@ -51,9 +52,9 @@ class StorageWindow(QMainWindow):
         self.layout.addWidget(self.add_button, 0, 0)
         self.layout.addWidget(self.search_button, 0, 1)
         self.layout.setAlignment(Qt.AlignCenter)
-        widget.setLayout(self.layout)
+        self.widget.setLayout(self.layout)
 
-        self.setCentralWidget(widget)
+        self.setCentralWidget(self.widget)
         self.setWindowTitle("Storage")
         self.setMinimumSize(QSize(750, 500))
         self.show()
@@ -62,6 +63,7 @@ class StorageWindow(QMainWindow):
         filter_by = self.combo.currentText()
         value = self.search_entry.text()
         self.frames = []
+        self.storage_handler.decrypt()
 
         if not value:
             QMessageBox.critical(self, "Error!", "Please fill in the search entry.")
@@ -83,10 +85,11 @@ class StorageWindow(QMainWindow):
             username = result[1][i][1]
             password = result[1][i][2]
             url = result[1][i][3]
-            frame = Frame(title=title,
+            frame = Frame(
+                title=title,
                 username=username,
                 password=password,
-                url=url
+                url=url,
             )
             self.frames.append(frame)
             self.layout.addWidget(frame, row, 1)
@@ -126,10 +129,11 @@ class StorageWindow(QMainWindow):
 
 
     def closeEvent(self, event):
-    	reply = QMessageBox.question(self, "Quit?", "Are you sure you want to quit?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        reply = QMessageBox.question(self, "Quit?", "Are you sure you want to quit?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        self.storage_handler.encrypt()
 
-    	if reply == QMessageBox.Yes:
-    		self.storage_handler.close()
-    		event.accept()
-    	else:
-    		event.ignore()
+        if reply == QMessageBox.Yes:
+            self.storage_handler.close()
+            event.accept()
+        else:
+            event.ignore()
