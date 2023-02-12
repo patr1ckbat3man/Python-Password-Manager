@@ -1,6 +1,5 @@
 import os
 import sys
-import hashlib
 
 sys.path.append(os.path.abspath(".."))
 
@@ -17,7 +16,8 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QSize
 
 import utils.mastermanip as mastermanip
-from .storage import StorageWindow
+from utils.aes import AESCipher
+from .storagewindow import StorageWindow
 from constants import *
 
 class MasterWindow(QWidget):
@@ -61,21 +61,25 @@ class MasterWindow(QWidget):
 		self.show()
 
 	def auth(self):
-		key = self.entry.text().encode()
+		master_key = self.entry.text().encode()
 		self.entry.clear()
 
-		if not key:
+		if not master_key:
 			QMessageBox.critical(self, "Error!", "Please enter a password.")
 			return
 
+		encryptor = AESCipher()
+
 		if not os.path.exists(f"{DB_FOLDER}/{DB_MASTER}"):
-			mastermanip.write_key(key)
+			mastermanip.write_key(master_key)
+			encryptor.key = master_key
 			self.close()
-			StorageWindow(hashlib.sha256(key).digest()).show()
+			StorageWindow().show()
 		else:
-			if mastermanip.verify_key(key):
+			if mastermanip.verify_key(master_key):
+				encryptor.key = master_key
 				self.close()
-				StorageWindow(hashlib.sha256(key).digest()).show()
+				StorageWindow().show()
 			else:
 				QMessageBox.critical(self, "Error!", "Sorry, the password you entered is incorrect or the file you are trying to access is either corrupt or doesn't exist.")
 

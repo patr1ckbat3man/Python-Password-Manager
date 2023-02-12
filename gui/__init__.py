@@ -1,1 +1,1 @@
-from .master import MasterWindow
+from .masterwindow import MasterWindow

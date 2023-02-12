@@ -18,17 +18,17 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QSize
 
-import utils.storagemanip as storagemanip
-from .data import AddDataWindow
-from .frame import Frame
+from utils.db import DbManip
+from utils.aes import AESCipher
+from .datawindow import DataWindow
+from .entryframe import Frame
 from constants import *
 
 class StorageWindow(QMainWindow):
-    def __init__(self, master_key):
+    def __init__(self):
         super().__init__()
-        self.master_key = master_key
-        self.storage_handler = storagemanip.DbManip(self.master_key)
-        self.data_window = AddDataWindow(self, self.storage_handler)
+        self.storage_handler = DbManip()
+        self.data_window = DataWindow(self, self.storage_handler)
 
         self.widget = QWidget(self)
         self.layout = QGridLayout()
@@ -62,8 +62,6 @@ class StorageWindow(QMainWindow):
     def search(self):
         filter_by = self.combo.currentText()
         value = self.search_entry.text()
-        self.frames = []
-        self.storage_handler.decrypt()
 
         if not value:
             QMessageBox.critical(self, "Error!", "Please fill in the search entry.")
@@ -104,8 +102,6 @@ class StorageWindow(QMainWindow):
             self.cancel_button.setVisible(False)
             self.add_button.setVisible(True)
             self.search_button.setVisible(True)
-            for frame in self.frames:
-                frame.setVisible(False)
 
     def toggle(self):
         if self.search_entry.isVisible() and self.combo.isVisible():
@@ -130,7 +126,6 @@ class StorageWindow(QMainWindow):
 
     def closeEvent(self, event):
         reply = QMessageBox.question(self, "Quit?", "Are you sure you want to quit?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        self.storage_handler.encrypt()
 
         if reply == QMessageBox.Yes:
             self.storage_handler.close()

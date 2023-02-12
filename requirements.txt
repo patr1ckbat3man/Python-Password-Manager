@@ -1,2 +1,4 @@
 bcrypt
 PyQt5
+pycryptodome
+pyperclip

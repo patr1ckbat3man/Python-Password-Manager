@@ -24,30 +24,6 @@ class Frame(QFrame):
         self.layout.addWidget(self.title_label)
         self.setLayout(self.layout)
 
-    def copy_title(self):
-        pyperclip.copy(self._title)
-
-    def copy_username(self):
-        pyperclip.copy(self._username)
-
-    def copy_password(self):
-        pyperclip.copy(self._password)
-
-    def copy_url(self):
-        pyperclip.copy(self._url)
-
-    def copy_title(self):
-        pyperclip.copy(self._title)
-
-    def copy_username(self):
-        pyperclip.copy(self._username)
-
-    def copy_password(self):
-        pyperclip.copy(self._password)
-
-    def copy_url(self):
-        pyperclip.copy(self._url)
-
     def edit(self):
         pass
 

@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QSize
 
-class AddDataWindow(QWidget):
+class DataWindow(QWidget):
 	def __init__(self, parent=None, obj=None):
 		super().__init__()
 		self.parent = parent
