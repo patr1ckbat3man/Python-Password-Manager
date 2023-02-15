@@ -3,8 +3,8 @@ A password manager that runs on your computer, allowing you to access your passw
 ## Installation
 Install dependencies:
 ```bash
-sudo apt-get install xclip
 sudo apt-get install build-essential cargo
+sudo apt-get install xclip
 ```
 Create a virtual environment and install packages:
 ```bash

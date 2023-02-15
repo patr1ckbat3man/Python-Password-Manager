@@ -8,6 +8,7 @@ class AESCipher:
 	def __init__(self):
 		self._key = None
 		self.chunk_size = 64 * 1024
+		self.file = f"{DB_FOLDER}/{DB_STORAGE}"
 
 	@property
 	def key(self):
@@ -18,13 +19,12 @@ class AESCipher:
 		self._key = hashlib.sha256(password).digest()
 
 	def encrypt(self):
-		output_file = ""
 		iv = os.urandom(16)
 		encryptor = AES.new(self._key, AES.MODE_CBC, iv)
-		file_size = os.path.getsize(self._file)
+		file_size = os.path.getsize(self.file)
 
-		with open(self._file, "rb") as inp:
-			with open(output_file, "wb") as out:
+		with open(self.file, "rb") as inp:
+			with open(f"{self.file}.enc", "wb") as out:
 				out.write(struct.pack("<Q", file_size))
 				out.write(iv)
 
@@ -35,10 +35,10 @@ class AESCipher:
 					elif len(chunk) % 16 != 0:
 						chunk += b" " * (16 - len(chunk) % 16)
 					out.write(encryptor.encrypt(chunk))
+		os.remove(self.file)
 
 	def decrypt(self):
-		encrypted_file = ""
-		with open(encrypted_file, "rb") as inp:
+		with open(f"{self.file}.enc", "rb") as inp:
 			size = struct.unpack("<Q", inp.read(struct.calcsize("Q")))[0]
 			iv = inp.read(16)
 			decryptor = AES.new(self._key, AES.MODE_CBC, iv)
@@ -50,3 +50,4 @@ class AESCipher:
 						break
 					out.write(decryptor.decrypt(chunk))
 				out.truncate(size)
+		os.remove(f"{self.file}.enc")

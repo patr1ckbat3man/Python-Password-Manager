@@ -3,8 +3,6 @@ import json
 
 import bcrypt
 
-from constants import *
-
 def verify_key(key):
 	salt = bcrypt.gensalt()
 

@@ -1,19 +1,19 @@
 import os
 import sqlite3
 
-from constants import *
-
-class DbManip(object):
+class DbManip:
 	def __init__(self):
-		if not os.path.exists(f"{DB_FOLDER}/{DB_STORAGE}"):
-			open(f"{DB_FOLDER}/{DB_STORAGE}", "w").close()
-
-		self.connection = sqlite3.connect(f"{DB_FOLDER}/{DB_STORAGE}")
-		self.cursor = self.connection.cursor()
+		self.connection = None
+		self.cursor = None
 
 	def create_storage(self):
+		if not os.path.exists(f"{DB_FOLDER}/{DB_STORAGE}"):
+			open(f"{DB_FOLDER}/{DB_STORAGE}", "w").close()
+		self.connection = sqlite3.connect(f"{DB_FOLDER}/{DB_STORAGE}")
+		self.cursor = self.connection.cursor()
 		self.cursor.execute("create table if not exists storage(title TEXT, username TEXT, password TEXT, url TEXT)")
 		self.connection.commit()
+		self.CREATED = True
 
 	def table_exists(self):
 		self.cursor.execute("select name from sqlite_master where type='table' and name='storage'")
@@ -50,5 +50,4 @@ class DbManip(object):
 		pass
 
 	def close(self):
-		self.cursor.close()
-		self.connection.close()
+        pass

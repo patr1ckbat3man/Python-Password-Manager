@@ -1,1 +1,0 @@
-from .masterwindow import MasterWindow
