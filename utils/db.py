@@ -30,13 +30,12 @@ class DbManip:
 			self.connection = sqlite3.connect(STORAGE_MASTER)
 			self.cursor = self.connection.cursor()
 			self.cursor.execute("create table if not exists master(hash BLOB NOT NULL);")
-			query = "insert into master (hash) VALUES (?);"
-			data = (key_hash,)
-			self.cursor.execute(query, data)
+			self.cursor.execute("insert into master (hash) values (?);", (key_hash,))
 			self.connection.commit()
 			self.cursor.close()
 			return True
 		except sqlite3.Error:
+			print("Error occurred while writing master key to database.")
 			return False
 		finally:
 			self.close_connections()
@@ -59,14 +58,15 @@ class DbManip:
 		try:
 			self.connection = sqlite3.connect(STORAGE_MASTER)
 			self.cursor = self.connection.cursor()
-			query = "select hash from master;"
-			key_hash = self.cursor.execute(query).fetchone()[0]
+			key_hash = self.cursor.execute("select hash from master;").fetchone()[0]
 			self.cursor.close()
 			if bcrypt.checkpw(key.encode(), key_hash):
 				return True
 			else:
+				print("Error veryfing master key. Database might be corrupted or password is incorrect.")
 				return False
 		except sqlite3.Error:
+			print("Error occurred while veryfing master key.")
 			return False
 		finally:
 			self.close_connections()
@@ -90,8 +90,7 @@ class DbManip:
 		try:
 			self.connection = sqlite3.connect(STORAGE_MASTER)
 			self.cursor = self.connection.cursor()
-			query = "update master set hash = ?;"
-			self.cursor.execute(query, (key_hash,))
+			self.cursor.execute("update master set hash = ?;", (key_hash,))
 			self.connection.commit()
 			self.cursor.close()
 			return True
@@ -101,15 +100,27 @@ class DbManip:
 			self.close_connections()
 
 	def table_exists(self, table_name):
+		"""Check if table exists.
+
+		Parameters
+		----------
+		table_name : string
+			Name of database table.
+
+		Returns
+		-------
+		bool
+			boolean indicating whether the table exists.
+		"""
 		try:
-			self.connection(STORAGE_DB)
+			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
-			query = "select name from sqlite_master where type='table' and name = ?;"
-			self.cursor.execute(query, (table_name,))
+			self.cursor.execute("select name from sqlite_master where type='table' and name = ?;", (table_name,))
 			result = self.cursor.fetchall()
 			if result:
 				return True
 			else:
+				print("No data to query for. Add some entries first.")
 				return False
 		except sqlite3.Error:
 			return False
@@ -117,45 +128,115 @@ class DbManip:
 			self.close_connections()
 
 	def entry_exists(self, filter_by, value):
-		try:
-			query = f"select * storage where {filter_by} = ?"
-			self.cursor.execute(query, (value,))
-			result = self.cursor.fetchall()
-		except sqlite3.OperationalError:
-			return (False, [])
+		"""Check if entry exists.
 
-		if result:
-			return (True, result)
-		else:
-			return (False, [])
+		Parameters
+		----------
+		filter_by : string
+			Name of column which is gonna be filtered.
 
-	def add_entry(self, **kwargs):
-		columns = ", ".join(kwargs.keys())
-		placeholders = ", ".join(["?"] * len(kwargs))
-		query = f"insert into storage ({columns}) values ({placeholders});"
+		value : string
+			Value to be searched for in filtered column.
 
+		Returns
+		-------
+			Tuple of filtered rows, if some entries are found.
+			False, if the entry doesn't exist.
+		"""
 		try:
 			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
-			self.cursor.execute("create table if not exists storage(title TEXT NOT NULL, username TEXT, password TEXT NOT NULL, url TEXT);")
-			self.cursor.execute(query, tuple(kwargs.values()))
-			self.connection.commit()
-			return True
+			self.cursor.execute(f"select * from storage where {filter_by} = ?", (value,))
+			result = self.cursor.fetchall()
+			if result:
+				return result
 		except sqlite3.Error:
 			return False
 		finally:
 			self.close_connections()
 
-	def search_entry(self, filter_by):
+	def add_entry(self, **kwargs):
+		"""Add entry to database.
+
+		Parameters
+		----------
+		**kwargs : dict
+			Data entered by the user
+
+			- title : str
+			- username : str
+			- password : str
+			- url : str
+
+		Returns
+		-------
+		bool
+			boolean indicating whether the entry was succesfully added.
+		"""
+		if not os.path.exists(STORAGE_DB):
+			open(STORAGE_DB, "a").close()
+
+		columns = ", ".join(kwargs.keys())
+		placeholders = ", ".join(["?"] * len(kwargs))
+
+		try:
+			self.connection = sqlite3.connect(STORAGE_DB)
+			self.cursor = self.connection.cursor()
+			self.cursor.execute("create table if not exists storage(title TEXT NOT NULL, username TEXT, password TEXT NOT NULL, url TEXT);")
+			self.cursor.execute(f"insert into storage ({columns}) values ({placeholders});", tuple(kwargs.values()))
+			self.connection.commit()
+			return True
+		except sqlite3.Error:
+			print("Error while adding entry.")
+			return False
+		finally:
+			self.close_connections()
+
+	def search_entry(self, filter_by, value):
+		"""
+
+		Parameters
+		----------
+
+		Returns
+		-------
+		"""
+		result = self.entry_exists(filter_by, value)
+		print(result)
+
+	def update_entry(self):
+		"""
+
+		Parameters
+		----------
+
+		Returns
+		-------
+		"""
 		pass
 
-	def update_entry(self, filter_by):
-		pass
+	def delete_entry(self):
+		"""
 
-	def delete_entry(self, filter_by):
+		Parameters
+		----------
+
+		Returns
+		-------
+		"""
 		pass
 
 	def close_connections(self):
+		"""Close all database connections.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
 		if self.connection:
 			self.cursor.close()
 			self.connection.close()
