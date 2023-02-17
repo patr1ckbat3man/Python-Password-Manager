@@ -1,2 +1,5 @@
+from utils.manager import PasswordManager
+
 if __name__ == "__main__":
-    pass
+    app = PasswordManager()
+    app.auth()

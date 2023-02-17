@@ -4,19 +4,21 @@ import hashlib
 
 from Crypto.Cipher import AES
 
+from .constants import *
+
 class AESCipher:
 	def __init__(self):
 		self._key = None
 		self.chunk_size = 64 * 1024
-		self.file = f"{DB_FOLDER}/{DB_STORAGE}"
+		self.file = STORAGE_DB
 
 	@property
 	def key(self):
 		return self._key
 
 	@key.setter
-	def key(self, password):
-		self._key = hashlib.sha256(password).digest()
+	def key(self, master_key):
+		self._key = hashlib.sha256(master_key.encode()).digest()
 
 	def encrypt(self):
 		iv = os.urandom(16)
