@@ -21,6 +21,16 @@ class AESCipher:
 		self._key = hashlib.sha256(master_key.encode()).digest()
 
 	def encrypt(self):
+		"""Encrypt chosen database.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
 		iv = os.urandom(16)
 		encryptor = AES.new(self._key, AES.MODE_CBC, iv)
 		file_size = os.path.getsize(self.file)
@@ -40,6 +50,16 @@ class AESCipher:
 		os.remove(self.file)
 
 	def decrypt(self):
+		"""Decrypt chosen database.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
 		with open(f"{self.file}.enc", "rb") as inp:
 			size = struct.unpack("<Q", inp.read(struct.calcsize("Q")))[0]
 			iv = inp.read(16)
