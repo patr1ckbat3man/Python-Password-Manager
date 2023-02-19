@@ -8,6 +8,7 @@ from .constants import *
 
 class PasswordManager:
 	def __init__(self):
+		self.encrypted = None
 		self.encryptor = None
 		self.dbmanip = DatabaseHandler()
 
@@ -31,24 +32,51 @@ class PasswordManager:
 	def change(self):
 		new_key = getpass.getpass(prompt="Enter new master key: ")
 		if self.dbmanip.change_key(new_key):
+			self.encryptor.key = new_key
 			print("Master key succesfully changed.")
 			self.prompt_menu()
 
-	def add(self):
-		if self.dbmanip.add_entry():
-			self.prompt_menu()
+	def update_db(func):
+		def wrapper(self, *args, **kwargs):
+			if os.path.isfile(f"{STORAGE_DB}.enc"):
+				self.encryptor.decrypt()
 
+			result = func(self, *args, **kwargs)
+
+			self.encryptor.encrypt()
+
+			return result
+		return wrapper
+
+	@update_db
+	def add(self):
+		if self.dbmanip.table_exists(DB_TABLE):
+			self.dbmanip.add_entry()
+
+	@update_db
 	def search(self):
 		if self.dbmanip.table_exists(DB_TABLE):
 			self.dbmanip.display_entry()
 
+	@update_db
 	def update(self):
 		if self.dbmanip.table_exists(DB_TABLE):
-			self.dbmanip.update_entry()
+			self.dbmanip.delete_entry()
 
+	@update_db
 	def delete(self):
 		if self.dbmanip.table_exists(DB_TABLE):
 			self.dbmanip.delete_entry()
+
+	def exit(self):
+		if os.path.isfile(STORAGE_DB) and os.path.getsize(STORAGE_DB) > 0:
+			if not self.encrypted:
+				self.encryptor.encrypt()
+				self.encrypted = True
+		else:
+			self.encrypted = False
+		print("Exiting...")
+		sys.exit()	
 
 	def prompt_menu(self):
 		actions = {
@@ -57,7 +85,8 @@ class PasswordManager:
 			3: lambda: self.update(),
 			4: lambda: self.delete(),
 			5: lambda: self.change(),
-			6: sys.exit
+			6: lambda: self.exit(),
+			"default": lambda: print("Wrong choice! Try again.")
 		}
 
 		print("1 - Add entry")
@@ -69,7 +98,8 @@ class PasswordManager:
 
 		try:
 			choice = int(input("> "))
-			actions.get(choice, lambda: print("Wrong choice! Try again."))()
+			action = actions.get(choice, actions["default"])
+			action()
 			self.prompt_menu()
 		except ValueError:
 			print("Wrong data input! Try again.")

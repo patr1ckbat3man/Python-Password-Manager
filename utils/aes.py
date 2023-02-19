@@ -65,7 +65,7 @@ class AESCipher:
 			iv = inp.read(16)
 			decryptor = AES.new(self._key, AES.MODE_CBC, iv)
 
-			with open(self._file, "wb") as out:
+			with open(self.file, "wb") as out:
 				while True:
 					chunk = inp.read(self.chunk_size)
 					if not chunk:

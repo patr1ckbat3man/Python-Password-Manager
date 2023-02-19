@@ -22,7 +22,7 @@ class DatabaseHandler:
 		Returns
 		-------
 		bool
-			boolean indicating whether the key was sucesfully written.
+			Boolean indicating whether the key was sucesfully written.
 		"""
 		salt = bcrypt.gensalt()
 		key_hash = bcrypt.hashpw(key.encode(), salt)
@@ -52,7 +52,7 @@ class DatabaseHandler:
 		Returns
 		-------
 		bool
-			boolean indicating wheter the entered master key is valid.
+			Boolean indicating wheter the entered master key is valid.
 		"""
 		salt = bcrypt.gensalt()
 
@@ -83,7 +83,7 @@ class DatabaseHandler:
 		Returns
 		-------
 		bool
-			boolean indicating wheter the key was changed.
+			Boolean indicating wheter the key was changed.
 		"""
 		salt = bcrypt.gensalt()
 		key_hash = bcrypt.hashpw(new_key.encode(), salt)
@@ -102,7 +102,7 @@ class DatabaseHandler:
 			self.close_connections()
 
 	def table_exists(self, table_name):
-		"""Check if table exists.
+		"""Check for the table existence in database.
 
 		Parameters
 		----------
@@ -112,7 +112,7 @@ class DatabaseHandler:
 		Returns
 		-------
 		bool
-			boolean indicating whether the table exists.
+			Boolean indicating whether the table exists.
 		"""
 		try:
 			self.connection = sqlite3.connect(STORAGE_DB)
@@ -122,9 +122,10 @@ class DatabaseHandler:
 			if result:
 				return True
 			else:
-				print("No data to query for. Add some entries first.")
+				print("No data to query! Add some entries first.")
 				return False
 		except sqlite3.Error:
+			print("Error occurred while checking the existence of table.")
 			return False
 		finally:
 			self.close_connections()
@@ -142,7 +143,9 @@ class DatabaseHandler:
 
 		Returns
 		-------
+		result : tuple
 			Tuple of filtered row/rows, if some entries are found.
+		bool
 			False, if the entry doesn't exist.
 		"""
 		try:
@@ -161,6 +164,17 @@ class DatabaseHandler:
 			self.close_connections()
 
 	def add_entry(self):
+		"""Add user entries to database.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		bool
+			Boolean indicating whether the entry was added.
+		"""
 		if not os.path.exists(STORAGE_DB):
 			open(STORAGE_DB, "a").close()
 
@@ -181,11 +195,32 @@ class DatabaseHandler:
 			self.close_connections()
 
 	def display_entry(self):
+		"""Display filtered entries.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "display", prompt=False)
 
 	def update_entry(self):
+		"""Update filtered entries.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		bool
+			boolean indicating whether the entries were succesfully updated.
+		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "update")
@@ -203,6 +238,7 @@ class DatabaseHandler:
 						self.cursor.execute("update storage set title = ?, username = ?, password = ?, url = ? WHERE id = ?;", (ttl, usr, psw, url, entry_id,))
 				self.connection.commit()
 				print(f"Updated {len(processed_entries)} entry/entries.")
+			return True
 		except sqlite3.Error:
 			print("Error occurred while updating entry/entries from database.")
 			return False
@@ -210,6 +246,16 @@ class DatabaseHandler:
 			self.close_connections()
 
 	def delete_entry(self):
+		"""Delete filtered entries.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "delete")
@@ -233,6 +279,23 @@ class DatabaseHandler:
 			self.close_connections()
 
 	def prompt_data(self):
+		"""Display choices of data to be entered into entry.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		title : str
+			Title 
+		username : str
+			Username 
+		password : str
+			Password
+		url : str
+			URL
+		"""
 		title = str(input("Title: (Mandatory)\n> "))
 		if not title:
 			print("Title has to be filled in.")
@@ -246,6 +309,19 @@ class DatabaseHandler:
 		return title, username, password, url
 
 	def prompt_filter(self):
+		"""Display choices for filters.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		column_filter : str
+			Name of column which is gonna be filtered.
+		value : str
+			Value to be searched for in filtered column.
+		"""
 		filter_options = {
 			"t": "title",
 			"u": "username",
@@ -276,15 +352,15 @@ class DatabaseHandler:
 
 		Returns
 		-------
-		tuple
+		entries : tuple
 			tuple containing arrays for each processed entry.		
 		"""
 		if not entries:
 			print("No entries found.")
 			return
 
-		print(f"Found {len(entries)} matching entries:")
-		print("Order of values in entry: (ID, Title, Username, Password, URL)")
+		print(f"Found {len(entries)} matching entry/entries:")
+		print("<choice> - (ID, Title, Username, Password, URL)")
 		for idx, val in enumerate(entries):
 			print(f"{idx+1} - {val}")
 
@@ -306,12 +382,22 @@ class DatabaseHandler:
 							print("Invalid choice!")
 							return
 					except ValueError:
-						print("Invalid choice!")
+						print("Wrong data input!")
 						return
 		else:
 			return entries
 
 	def close_connections(self):
+		"""Close all database connections.
+
+		Parameters
+		----------
+		None
+
+		Returns
+		-------
+		None
+		"""
 		if self.connection:
 			self.cursor.close()
 			self.connection.close()
