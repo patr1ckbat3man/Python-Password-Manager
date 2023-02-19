@@ -169,7 +169,7 @@ class DatabaseHandler:
 		try:
 			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
-			self.cursor.execute("create table if not exists storage(title TEXT NOT NULL, username TEXT, password TEXT NOT NULL, url TEXT);")
+			self.cursor.execute("create table if not exists storage(id INTEGER PRIMARY KEY, title TEXT NOT NULL, username TEXT, password TEXT NOT NULL, url TEXT);")
 			self.cursor.execute(f"insert into storage (title, username, password, url) values (?, ?, ?, ?);", (ttl, usr, psw, url,))
 			self.connection.commit()
 			print("Entry succesfully added.")
@@ -185,24 +185,52 @@ class DatabaseHandler:
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "display", prompt=False)
 
-		for entry in processed_entries:
-			print(entry)
-
 	def update_entry(self):
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "update")
 
-		for entry in processed_entries:
-			print(entry)
+		try:
+			self.connection = sqlite3.connect(STORAGE_DB)
+			self.cursor = self.connection.cursor()
+
+			if processed_entries: # Have to check, otherwise we might get NoneType error
+				for entry in processed_entries:
+					if isinstance(entry, tuple):
+						entry_id = entry[0]
+						print(f"Updating values for: {entry}")
+						ttl, usr, psw, url = self.prompt_data()
+						self.cursor.execute("update storage set title = ?, username = ?, password = ?, url = ? WHERE id = ?;", (ttl, usr, psw, url, entry_id,))
+				self.connection.commit()
+				print(f"Updated {len(processed_entries)} entry/entries.")
+		except sqlite3.Error:
+			print("Error occurred while updating entry/entries from database.")
+			return False
+		finally:
+			self.close_connections()
 
 	def delete_entry(self):
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "delete")
 
-		for entry in processed_entries:
-			print(entry)
+		try:
+			self.connection = sqlite3.connect(STORAGE_DB)
+			self.cursor = self.connection.cursor()
+
+			if processed_entries:
+				for entry in processed_entries:
+					if isinstance(entry, tuple):
+						entry_id = entry[0]
+						self.cursor.execute("delete from storage where id = ?;", (entry_id,))
+				self.connection.commit()
+				print(f"Deleted {len(processed_entries)} entry/entries.")
+			return True
+		except sqlite3.Error:
+			print("Error occurred while deleting entry/entries from database.")
+			return False
+		finally:
+			self.close_connections()
 
 	def prompt_data(self):
 		title = str(input("Title: (Mandatory)\n> "))
@@ -227,9 +255,9 @@ class DatabaseHandler:
 		column = input("Filter by (t=Title / u=Username / r=URL):\n> ").strip().lower()
 		if column not in filter_options:
 			print("Wrong filter specified! Try again.")
-			self.prompt_filter()
-		column_filter = filter_options[column]
+			return self.prompt_filter()
 
+		column_filter = filter_options[column]
 		value = input(f"Value to search for in {column_filter} column:\n> ").strip().lower()
 
 		return column_filter, value
@@ -243,23 +271,29 @@ class DatabaseHandler:
 			List of fetched entries.
 		operation : string
 			Operation chosen by user.
+		prompt : bool
+			boolean indicating whether the prompt is gonna appear or not.
 
 		Returns
 		-------
-		None		
+		tuple
+			tuple containing arrays for each processed entry.		
 		"""
 		if not entries:
 			print("No entries found.")
 			return
 
-		if len(entries) == 1:
-			return entries[0]
-		else:
-			print(f"Found {len(entries)} matching entries:")
-			for idx, val in enumerate(entries):
-				print(f"{idx+1} - {val}")
+		print(f"Found {len(entries)} matching entries:")
+		print("Order of values in entry: (ID, Title, Username, Password, URL)")
+		for idx, val in enumerate(entries):
+			print(f"{idx+1} - {val}")
 
-			if prompt:
+		if prompt:
+			if len(entries) == 1:
+				choice = input(f"Select an entry to {operation}:\n> ")
+				index = int(choice) - 1
+				return [entries[index]]
+			else:
 				choice = input(f"Select an entry to {operation} (1-{len(entries)}), or 'all':\n> ")
 				if choice == "all":
 					return entries
@@ -274,6 +308,8 @@ class DatabaseHandler:
 					except ValueError:
 						print("Invalid choice!")
 						return
+		else:
+			return entries
 
 	def close_connections(self):
 		if self.connection:
