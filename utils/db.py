@@ -7,102 +7,63 @@ import bcrypt
 from .constants import *
 
 class DatabaseHandler:
-	def __init__(self):
+	def __init__(self, obj):
+		self.encryptor = obj
+		self.encrypted = None
+
 		self.connection = None
 		self.cursor = None
 
-	def write_key(self, key):
-		"""Write master key to database.
+	def handle_key(self, key=None, **kwargs):
+		"""Execute key operation based on parameters.
 
 		Parameters
 		----------
 		key : utf-8 encoded string
 			Master key of user.
 
-		Returns
-		-------
-		bool
-			Boolean indicating whether the key was sucesfully written.
-		"""
-		salt = bcrypt.gensalt()
-		key_hash = bcrypt.hashpw(key.encode(), salt)
-
-		try:
-			self.connection = sqlite3.connect(STORAGE_MASTER)
-			self.cursor = self.connection.cursor()
-			self.cursor.execute("create table if not exists master(hash BLOB NOT NULL);")
-			self.cursor.execute("insert into master (hash) values (?);", (key_hash,))
-			self.connection.commit()
-			self.cursor.close()
-			return True
-		except sqlite3.Error:
-			print("Error occurred while writing master key to database.")
-			return False
-		finally:
-			self.close_connections()
-
-	def verify_key(self, key):
-		"""Verify entered master key.
-
-		Parameters
-		----------
-		key : utf-8 encoded string
-			Master key of user.
+		**kwargs : dict
+			Optional keyword arguments specifying the key operation to execute.
 
 		Returns
 		-------
 		bool
-			Boolean indicating wheter the entered master key is valid.
+			Boolean indicating whether the operation was succesful.
 		"""
 		salt = bcrypt.gensalt()
 
 		try:
-			self.connection = sqlite3.connect(STORAGE_MASTER)
+			self.connection = sqlite3.connect(MASTER_DB)
 			self.cursor = self.connection.cursor()
-			key_hash = self.cursor.execute("select hash from master;").fetchone()[0]
-			self.cursor.close()
-			if bcrypt.checkpw(key.encode(), key_hash):
+
+			if kwargs.get("write"):
+				key_hash = bcrypt.hashpw(key.encode(), salt)
+				self.cursor.execute("create table if not exists master(hash BLOB NOT NULL);")
+				self.cursor.execute("insert into master (hash) values (?);", (key_hash,))
+				self.connection.commit()
+				return True
+			elif kwargs.get("verify"):
+				key_hash = self.cursor.execute("select hash from master;").fetchone()[0]
+				if bcrypt.checkpw(key.encode(), key_hash):
+					return True
+				else:
+					return False
+			elif kwargs.get("change"):
+				new_key_hash = bcrypt.hashpw(key.encode(), salt)
+				self.cursor.execute("update master set hash=?;", (new_key_hash,))
+				self.connection.commit()
 				return True
 			else:
-				print("Error veryfing master key. Database might be corrupted or password is incorrect.")
+				print("Invalid operation.")
 				return False
 		except sqlite3.Error:
-			print("Error occurred while veryfing master key.")
+			print(f"Error ocurred while handling the master key.")
 			return False
 		finally:
-			self.close_connections()
+			self._close_connections()
 
-	def change_key(self, new_key):
-		"""Change the current master key.
-
-		Parameters
-		----------
-		new_key : utf-8 encoded string
-			Master key of user.
-
-		Returns
-		-------
-		bool
-			Boolean indicating wheter the key was changed.
-		"""
-		salt = bcrypt.gensalt()
-		key_hash = bcrypt.hashpw(new_key.encode(), salt)
-
-		try:
-			self.connection = sqlite3.connect(STORAGE_MASTER)
-			self.cursor = self.connection.cursor()
-			self.cursor.execute("update master set hash = ?;", (key_hash,))
-			self.connection.commit()
-			self.cursor.close()
-			return True
-		except sqlite3.error:
-			print("Error occurred while changing the master key.")
-			return False
-		finally:
-			self.close_connections()
-
-	def table_exists(self, table_name):
-		"""Check for the table existence in database.
+	def table_empty(self, table_name):
+		"""Check for the table existence in the database.
 
 		Parameters
 		----------
@@ -114,21 +75,30 @@ class DatabaseHandler:
 		bool
 			Boolean indicating whether the table exists.
 		"""
+		if not os.path.isfile(STORAGE_DB):
+			print("No data to query! Add some entries first.")
+			return True
+
 		try:
 			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
-			self.cursor.execute("select name from sqlite_master where type='table' and name = ?;", (table_name,))
-			result = self.cursor.fetchall()
-			if result:
-				return True
+			self.cursor.execute(f"select name from sqlite_master where type='table' and name='{table_name}';")
+			table_exists = self.cursor.fetchall()
+			self.cursor.execute("select count(*) from storage;")
+			row_count = self.cursor.fetchall()
+			if not table_exists:
+				if row_count[0][0] == 0:
+					print("No data to query! Add some entries first.")
+					return True
+				else:
+					return False
 			else:
-				print("No data to query! Add some entries first.")
 				return False
 		except sqlite3.Error:
 			print("Error occurred while checking the existence of table.")
 			return False
 		finally:
-			self.close_connections()
+			self._close_connections()
 
 	def fetch_entries(self, filter_by, value):
 		"""Fetch all entries if they exist.
@@ -151,29 +121,32 @@ class DatabaseHandler:
 		try:
 			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
-			self.cursor.execute(f"select * from storage where {filter_by} = ?", (value,))
+			self.cursor.execute(f"select * from storage where {filter_by}=?", (value,))
 			result = self.cursor.fetchall()
 			if result:
 				return result
-			else:
-				return False
-		except sqlite3.Error:
-			print("Error wile checking for existence of entry.")
-			return False
+		except sqlite3.Error as e:
+			print(e, "Error wile checking for existence of entry.")
 		finally:
-			self.close_connections()
+			self._close_connections()
 
+	def update_database(func):
+		def wrapper(self, *args, **kwargs):
+			if os.path.isfile(f"{STORAGE_DB}.enc") and self.encrypted:
+				self.encryptor.decrypt()
+
+			result = func(self, *args, **kwargs)
+
+			if os.path.isfile(STORAGE_DB):
+				self.encryptor.encrypt()
+				self.encrypted = True
+
+			return result
+		return wrapper
+
+	@update_database
 	def add_entry(self):
 		"""Add user entries to database.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		bool
-			Boolean indicating whether the entry was added.
 		"""
 		if not os.path.exists(STORAGE_DB):
 			open(STORAGE_DB, "a").close()
@@ -187,39 +160,22 @@ class DatabaseHandler:
 			self.cursor.execute(f"insert into storage (title, username, password, url) values (?, ?, ?, ?);", (ttl, usr, psw, url,))
 			self.connection.commit()
 			print("Entry succesfully added.")
-			return True
 		except sqlite3.Error:
 			print("Error while adding entry.")
-			return False
 		finally:
-			self.close_connections()
+			self._close_connections()
 
+	@update_database
 	def display_entry(self):
 		"""Display filtered entries.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		None
 		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
 		processed_entries = self.process_entries(entries, "display", prompt=False)
 
+	@update_database
 	def update_entry(self):
 		"""Update filtered entries.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		bool
-			boolean indicating whether the entries were succesfully updated.
 		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
@@ -229,32 +185,23 @@ class DatabaseHandler:
 			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
 
-			if processed_entries: # Have to check, otherwise we might get NoneType error
+			if processed_entries:
 				for entry in processed_entries:
 					if isinstance(entry, tuple):
 						entry_id = entry[0]
 						print(f"Updating values for: {entry}")
 						ttl, usr, psw, url = self.prompt_data()
-						self.cursor.execute("update storage set title = ?, username = ?, password = ?, url = ? WHERE id = ?;", (ttl, usr, psw, url, entry_id,))
+						self.cursor.execute("update storage set title=?, username=?, password=?, url=? where id=?;", (ttl, usr, psw, url, entry_id,))
 				self.connection.commit()
 				print(f"Updated {len(processed_entries)} entry/entries.")
-			return True
 		except sqlite3.Error:
 			print("Error occurred while updating entry/entries from database.")
-			return False
 		finally:
-			self.close_connections()
+			self._close_connections()
 
+	@update_database
 	def delete_entry(self):
 		"""Delete filtered entries.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		None
 		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
@@ -268,15 +215,13 @@ class DatabaseHandler:
 				for entry in processed_entries:
 					if isinstance(entry, tuple):
 						entry_id = entry[0]
-						self.cursor.execute("delete from storage where id = ?;", (entry_id,))
+						self.cursor.execute("delete from storage where id=?;", (entry_id,))
 				self.connection.commit()
 				print(f"Deleted {len(processed_entries)} entry/entries.")
-			return True
 		except sqlite3.Error:
 			print("Error occurred while deleting entry/entries from database.")
-			return False
 		finally:
-			self.close_connections()
+			self._close_connections()
 
 	def prompt_data(self):
 		"""Display choices of data to be entered into entry.
@@ -301,7 +246,7 @@ class DatabaseHandler:
 			print("Title has to be filled in.")
 			self.prompt_data()
 		username = str(input("Username: (If none, leave empty)\n> "))
-		password = getpass.getpass(prompt="Password: (Mandatory)\n> ")
+		password = getpass.getpass("Password: (Mandatory)\n> ")
 		if not password:
 			print("Password field has to be filled in.")
 			self.prompt_data()
@@ -387,16 +332,8 @@ class DatabaseHandler:
 		else:
 			return entries
 
-	def close_connections(self):
+	def _close_connections(self):
 		"""Close all database connections.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		None
 		"""
 		if self.connection:
 			self.cursor.close()

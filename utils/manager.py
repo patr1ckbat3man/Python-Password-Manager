@@ -8,84 +8,55 @@ from .constants import *
 
 class PasswordManager:
 	def __init__(self):
-		self.encrypted = None
 		self.encryptor = None
-		self.dbmanip = DatabaseHandler()
+		self.datamanip = None
 
 	def auth(self):
-		if not os.path.exists(STORAGE):
-			os.mkdir(STORAGE)
+		if not os.path.exists(FOLDER):
+			os.mkdir(FOLDER)
 
 		self.encryptor = AESCipher()
+		self.datamanip = DatabaseHandler(self.encryptor)
 
-		if not os.path.exists(STORAGE_MASTER):
-			master_key = getpass.getpass(prompt="Create master key: ")
-			if self.dbmanip.write_key(master_key):
+		if not os.path.exists(MASTER_DB):
+			master_key = getpass.getpass("Create master key: ")
+			if self.datamanip.handle_key(master_key, write=True):
 				self.encryptor.key = master_key
 				self.prompt_menu()
 		else:
-			master_key = getpass.getpass(prompt=f"Enter master key for {STORAGE_DB}: ")
-			if self.dbmanip.verify_key(master_key):
+			master_key = getpass.getpass(f"Enter master key for {STORAGE_DB}: ")
+			if self.datamanip.handle_key(master_key, verify=True):
 				self.encryptor.key = master_key
 				self.prompt_menu()
 
 	def change(self):
-		new_key = getpass.getpass(prompt="Enter new master key: ")
-		if self.dbmanip.change_key(new_key):
+		new_key = getpass.getpass("Enter new master key: ")
+		if self.datamanip.handle_key(new_key, change=True):
 			self.encryptor.key = new_key
 			print("Master key succesfully changed.")
 			self.prompt_menu()
 
-	def update_db(func):
-		def wrapper(self, *args, **kwargs):
-			if os.path.isfile(f"{STORAGE_DB}.enc"):
-				self.encryptor.decrypt()
-
-			result = func(self, *args, **kwargs)
-
-			self.encryptor.encrypt()
-
-			return result
-		return wrapper
-
-	@update_db
-	def add(self):
-		if self.dbmanip.table_exists(DB_TABLE):
-			self.dbmanip.add_entry()
-
-	@update_db
-	def search(self):
-		if self.dbmanip.table_exists(DB_TABLE):
-			self.dbmanip.display_entry()
-
-	@update_db
-	def update(self):
-		if self.dbmanip.table_exists(DB_TABLE):
-			self.dbmanip.delete_entry()
-
-	@update_db
-	def delete(self):
-		if self.dbmanip.table_exists(DB_TABLE):
-			self.dbmanip.delete_entry()
-
-	def exit(self):
+	def close_database(self):
+		"""Check whether the file is encrypted and all connections are closed before exiting.
+		"""
 		if os.path.isfile(STORAGE_DB) and os.path.getsize(STORAGE_DB) > 0:
 			if not self.encrypted:
 				self.encryptor.encrypt()
 				self.encrypted = True
 		else:
 			self.encrypted = False
+		self._close_connections()
 		print("Exiting...")
-		sys.exit()	
+		sys.exit()
 
 	def prompt_menu(self):
 		actions = {
-			1: lambda: self.add(),
-			2: lambda: self.search(),
-			3: lambda: self.update(),
-			4: lambda: self.delete(),
+			1: lambda: self.datamanip.add_entry(),
+			2: lambda: self.datamanip.display_entry(),
+			3: lambda: self.datamanip.update_entry(),
+			4: lambda: self.datamanip.delete_entry(),
 			5: lambda: self.change(),
-			6: lambda: self.exit(),
+			6: lambda: sys.exit(),
 			"default": lambda: print("Wrong choice! Try again.")
 		}
 

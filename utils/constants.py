@@ -1,6 +1,6 @@
-__all__ = ["STORAGE", "STORAGE_MASTER", "STORAGE_DB", "DB_TABLE"]
+__all__ = ["FOLDER", "MASTER_DB", "STORAGE_DB", "STORAGE_TABLE"]
 
-STORAGE = "database"
-STORAGE_MASTER = "database/master.db"
+FOLDER = "database"
+MASTER_DB = "database/master.db"
 STORAGE_DB = "database/storage.db"
-DB_TABLE = "storage"
+STORAGE_TABLE = "storage"
