@@ -11,7 +11,6 @@ from .constants import *
 class DatabaseHandler:
 	def __init__(self, obj):
 		self.encryptor = obj
-		self.encrypted = None
 
 		self.connection = None
 		self.cursor = None
@@ -225,6 +224,50 @@ class DatabaseHandler:
 		except sqlite3.Error as e:
 			print(e)
 
+	def process_entries(self, entries, operation):
+		"""Process fetched entries.
+
+		Parameters
+		----------
+		entries : list
+			List of fetched entries.
+		operation : string
+			Operation chosen by user.
+
+		Returns
+		-------
+		entries : tuple
+			Tuple containing arrays for each processed entry.		
+		"""
+		if not entries:
+			print("No entries found.")
+			return
+
+		print("------------------------------------------------------------")
+		print(f"Found {len(entries)} matching entry/entries:")
+		print("<choice> - (ID, Title, Username, Password, URL)")
+		for idx, entry in enumerate(entries):
+			print(f"{idx+1} - {entry}")
+		print("------------------------------------------------------------")
+
+		if len(entries) == 1:
+			choice = input(f"Select an entry to {operation}:\n> ")
+			index = int(choice) - 1
+			return [entries[index]]
+		else:
+			choice = self.prompt_entry(operation, len(entries))
+			if choice == "all":
+				return entries
+			else:
+				try:
+					index = int(choice) - 1
+					if index >= 0 and index < len(entries):
+						return [entries[index]]
+					else:
+						print("Invalid choice!")
+				except ValueError:
+					print("Wrong data input!")
+
 	def prompt_data(self):
 		"""Display choices of data to be entered into entry.
 
@@ -281,51 +324,7 @@ class DatabaseHandler:
 
 		return column_filter, value
 
-	def process_entries(self, entries, operation):
-		"""Process fetched entries.
-
-		Parameters
-		----------
-		entries : list
-			List of fetched entries.
-		operation : string
-			Operation chosen by user.
-
-		Returns
-		-------
-		entries : tuple
-			Tuple containing arrays for each processed entry.		
-		"""
-		if not entries:
-			print("No entries found.")
-			return
-
-		print("------------------------------------------------------------")
-		print(f"Found {len(entries)} matching entry/entries:")
-		print("<choice> - (ID, Title, Username, Password, URL)")
-		for idx, entry in enumerate(entries):
-			print(f"{idx+1} - {entry}")
-		print("------------------------------------------------------------")
-
-		if len(entries) == 1:
-			choice = input(f"Select an entry to {operation}:\n> ")
-			index = int(choice) - 1
-			return [entries[index]]
-		else:
-			choice = self.get_user_input(operation, len(entries))
-			if choice == "all":
-				return entries
-			else:
-				try:
-					index = int(choice) - 1
-					if index >= 0 and index < len(entries):
-						return [entries[index]]
-					else:
-						print("Invalid choice!")
-				except ValueError:
-					print("Wrong data input!")
-
-	def get_user_input(self, operation, num_entries):
+	def prompt_entry(self, operation, num_entries):
 		"""Get user input based on operation.
 
 		Parameters
