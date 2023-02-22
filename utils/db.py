@@ -1,7 +1,9 @@
 import os
+import sys
 import sqlite3
 import getpass
 
+import pyperclip
 import bcrypt
 
 from .constants import *
@@ -13,6 +15,19 @@ class DatabaseHandler:
 
 		self.connection = None
 		self.cursor = None
+
+	def update_database(func):
+		def wrapper(self, *args, **kwargs):
+			if os.path.isfile(f"{STORAGE_DB}.aes"):
+				self.encryptor.decrypt()
+
+			result = func(self, *args, **kwargs)
+
+			if os.path.isfile(STORAGE_DB):
+				self.encryptor.encrypt()
+
+			return result
+		return wrapper
 
 	def handle_key(self, key=None, **kwargs):
 		"""Execute key operation based on parameters.
@@ -38,30 +53,115 @@ class DatabaseHandler:
 
 			if kwargs.get("write"):
 				key_hash = bcrypt.hashpw(key.encode(), salt)
-				self.cursor.execute("create table if not exists master(hash BLOB NOT NULL);")
-				self.cursor.execute("insert into master (hash) values (?);", (key_hash,))
+				self.cursor.execute("create table if not exists user(hash BLOB NOT NULL);")
+				self.cursor.execute("insert into user (hash) values (?);", (key_hash,))
 				self.connection.commit()
 				return True
 			elif kwargs.get("verify"):
-				key_hash = self.cursor.execute("select hash from master;").fetchone()[0]
+				key_hash = self.cursor.execute("select hash from user;").fetchone()[0]
 				if bcrypt.checkpw(key.encode(), key_hash):
 					return True
 				else:
 					return False
 			elif kwargs.get("change"):
 				new_key_hash = bcrypt.hashpw(key.encode(), salt)
-				self.cursor.execute("update master set hash=?;", (new_key_hash,))
+				self.cursor.execute("update user set hash=?;", (new_key_hash,))
 				self.connection.commit()
 				return True
 			else:
-				print("Invalid operation.")
-				return False
+				raise ValueError("Wrong key operation!")
 		except sqlite3.Error:
 			print(f"Error ocurred while handling the master key.")
 			return False
 		finally:
 			self._close_connections()
 
+	@update_database
+	def display_entry(self):
+		"""Display filtered entries.
+		"""
+		column, value = self.prompt_filter()
+		entries = self.fetch_entries(column, value)
+		processed_entries = self.process_entries(entries, "copy data from")
+
+		if processed_entries:
+			for entry in processed_entries:
+				if isinstance(entry, tuple):
+					entry_id = entry[0]
+					data = input("Which data would you like to copy? (title / username / password / url)\n> ").strip().lower()
+				if data not in ["title", "username", "password", "url"]:
+					print("Wrong choice.")
+					return
+				elif data == "title":
+					pyperclip.copy(entry[1])
+				elif data == "username":
+					pyperclip.copy(entry[2])
+				elif data == "password":
+					pyperclip.copy(entry[3])
+				elif data == "url":
+					pyperclip.copy(entry[4])
+
+	@update_database
+	def handle_database(self, **kwargs):
+		"""Execute database operation based on parameters.
+
+		Parameters
+		----------
+		**kwargs : dict
+			Optional keyword arguments specifying the key operation to execute.
+
+		Returns
+		-------
+		None	
+		"""
+		try:
+			self.connection = sqlite3.connect(STORAGE_DB)
+			self.cursor = self.connection.cursor()
+
+			if kwargs.get("add"):
+				if not os.path.exists(STORAGE_DB):
+					open(STORAGE_DB, "a").close()
+
+				ttl, usr, psw, url = self.prompt_data()
+
+				self.cursor.execute("create table if not exists storage(id INTEGER PRIMARY KEY, title TEXT, username TEXT, password TEXT, url TEXT);")
+				self.cursor.execute("insert into storage (title, username, password, url) values (?, ?, ?, ?);", (ttl, usr, psw, url))
+				self.connection.commit()
+				print("Entry succesfully added.")
+			elif kwargs.get("update"):
+				column, value = self.prompt_filter()
+				entries = self.fetch_entries(column, value)
+				processed_entries = self.process_entries(entries, "update")
+
+				if processed_entries:
+					for entry in processed_entries:
+						if isinstance(entry, tuple):
+							entry_id = entry[0]
+							print(f"Updating values for: {entry}")
+							ttl, usr, psw, url = self.prompt_data()
+							self.cursor.execute("update storage set title=?, username=?, password=?, url=? where id=?;", (ttl, usr, psw, url, entry_id,))
+					self.connection.commit()
+					print(f"Updated {len(processed_entries)} entry/entries.")
+			elif kwargs.get("delete"):
+				column, value = self.prompt_filter()
+				entries = self.fetch_entries(column, value)
+				processed_entries = self.process_entries(entries, "delete")
+
+				if processed_entries:
+					for entry in processed_entries:
+						if isinstance(entry, tuple):
+							entry_id = entry[0]
+							self.cursor.execute("delete from storage where id=?", (entry_id,))
+					self.connection.commit()
+					print(f"Deleted {len(processed_entries)} entry/entries.")
+			else:
+				raise ValueError("Wrong database operation!")
+		except sqlite3.Error as e:
+			print(e)
+		finally:
+			self._close_connections()
+
+	@update_database
 	def table_empty(self, table_name):
 		"""Check for the table existence in the database.
 
@@ -75,10 +175,6 @@ class DatabaseHandler:
 		bool
 			Boolean indicating whether the table exists.
 		"""
-		if not os.path.isfile(STORAGE_DB):
-			print("No data to query! Add some entries first.")
-			return True
-
 		try:
 			self.connection = sqlite3.connect(STORAGE_DB)
 			self.cursor = self.connection.cursor()
@@ -94,12 +190,11 @@ class DatabaseHandler:
 					return False
 			else:
 				return False
-		except sqlite3.Error:
-			print("Error occurred while checking the existence of table.")
+		except sqlite3.Error as e:
+			print(e)
 			return False
-		finally:
-			self._close_connections()
 
+	@update_database
 	def fetch_entries(self, filter_by, value):
 		"""Fetch all entries if they exist.
 
@@ -125,103 +220,10 @@ class DatabaseHandler:
 			result = self.cursor.fetchall()
 			if result:
 				return result
+			else:
+				return False
 		except sqlite3.Error as e:
-			print(e, "Error wile checking for existence of entry.")
-		finally:
-			self._close_connections()
-
-	def update_database(func):
-		def wrapper(self, *args, **kwargs):
-			if os.path.isfile(f"{STORAGE_DB}.enc") and self.encrypted:
-				self.encryptor.decrypt()
-
-			result = func(self, *args, **kwargs)
-
-			if os.path.isfile(STORAGE_DB):
-				self.encryptor.encrypt()
-				self.encrypted = True
-
-			return result
-		return wrapper
-
-	@update_database
-	def add_entry(self):
-		"""Add user entries to database.
-		"""
-		if not os.path.exists(STORAGE_DB):
-			open(STORAGE_DB, "a").close()
-
-		ttl, usr, psw, url = self.prompt_data()
-
-		try:
-			self.connection = sqlite3.connect(STORAGE_DB)
-			self.cursor = self.connection.cursor()
-			self.cursor.execute("create table if not exists storage(id INTEGER PRIMARY KEY, title TEXT NOT NULL, username TEXT, password TEXT NOT NULL, url TEXT);")
-			self.cursor.execute(f"insert into storage (title, username, password, url) values (?, ?, ?, ?);", (ttl, usr, psw, url,))
-			self.connection.commit()
-			print("Entry succesfully added.")
-		except sqlite3.Error:
-			print("Error while adding entry.")
-		finally:
-			self._close_connections()
-
-	@update_database
-	def display_entry(self):
-		"""Display filtered entries.
-		"""
-		column, value = self.prompt_filter()
-		entries = self.fetch_entries(column, value)
-		processed_entries = self.process_entries(entries, "display", prompt=False)
-
-	@update_database
-	def update_entry(self):
-		"""Update filtered entries.
-		"""
-		column, value = self.prompt_filter()
-		entries = self.fetch_entries(column, value)
-		processed_entries = self.process_entries(entries, "update")
-
-		try:
-			self.connection = sqlite3.connect(STORAGE_DB)
-			self.cursor = self.connection.cursor()
-
-			if processed_entries:
-				for entry in processed_entries:
-					if isinstance(entry, tuple):
-						entry_id = entry[0]
-						print(f"Updating values for: {entry}")
-						ttl, usr, psw, url = self.prompt_data()
-						self.cursor.execute("update storage set title=?, username=?, password=?, url=? where id=?;", (ttl, usr, psw, url, entry_id,))
-				self.connection.commit()
-				print(f"Updated {len(processed_entries)} entry/entries.")
-		except sqlite3.Error:
-			print("Error occurred while updating entry/entries from database.")
-		finally:
-			self._close_connections()
-
-	@update_database
-	def delete_entry(self):
-		"""Delete filtered entries.
-		"""
-		column, value = self.prompt_filter()
-		entries = self.fetch_entries(column, value)
-		processed_entries = self.process_entries(entries, "delete")
-
-		try:
-			self.connection = sqlite3.connect(STORAGE_DB)
-			self.cursor = self.connection.cursor()
-
-			if processed_entries:
-				for entry in processed_entries:
-					if isinstance(entry, tuple):
-						entry_id = entry[0]
-						self.cursor.execute("delete from storage where id=?;", (entry_id,))
-				self.connection.commit()
-				print(f"Deleted {len(processed_entries)} entry/entries.")
-		except sqlite3.Error:
-			print("Error occurred while deleting entry/entries from database.")
-		finally:
-			self._close_connections()
+			print(e)
 
 	def prompt_data(self):
 		"""Display choices of data to be entered into entry.
@@ -233,13 +235,9 @@ class DatabaseHandler:
 		Returns
 		-------
 		title : str
-			Title 
 		username : str
-			Username 
 		password : str
-			Password
 		url : str
-			URL
 		"""
 		title = str(input("Title: (Mandatory)\n> "))
 		if not title:
@@ -283,7 +281,7 @@ class DatabaseHandler:
 
 		return column_filter, value
 
-	def process_entries(self, entries, operation, prompt=True):
+	def process_entries(self, entries, operation):
 		"""Process fetched entries.
 
 		Parameters
@@ -292,45 +290,63 @@ class DatabaseHandler:
 			List of fetched entries.
 		operation : string
 			Operation chosen by user.
-		prompt : bool
-			boolean indicating whether the prompt is gonna appear or not.
 
 		Returns
 		-------
 		entries : tuple
-			tuple containing arrays for each processed entry.		
+			Tuple containing arrays for each processed entry.		
 		"""
 		if not entries:
 			print("No entries found.")
 			return
 
+		print("------------------------------------------------------------")
 		print(f"Found {len(entries)} matching entry/entries:")
 		print("<choice> - (ID, Title, Username, Password, URL)")
-		for idx, val in enumerate(entries):
-			print(f"{idx+1} - {val}")
+		for idx, entry in enumerate(entries):
+			print(f"{idx+1} - {entry}")
+		print("------------------------------------------------------------")
 
-		if prompt:
-			if len(entries) == 1:
-				choice = input(f"Select an entry to {operation}:\n> ")
-				index = int(choice) - 1
-				return [entries[index]]
-			else:
-				choice = input(f"Select an entry to {operation} (1-{len(entries)}), or 'all':\n> ")
-				if choice == "all":
-					return entries
-				elif choice.isdigit():
-					try:
-						index = int(choice) - 1
-						if index >= 0 and index < len(entries):
-							return [entries[index]]
-						else:
-							print("Invalid choice!")
-							return
-					except ValueError:
-						print("Wrong data input!")
-						return
+		if len(entries) == 1:
+			choice = input(f"Select an entry to {operation}:\n> ")
+			index = int(choice) - 1
+			return [entries[index]]
 		else:
-			return entries
+			choice = self.get_user_input(operation, len(entries))
+			if choice == "all":
+				return entries
+			else:
+				try:
+					index = int(choice) - 1
+					if index >= 0 and index < len(entries):
+						return [entries[index]]
+					else:
+						print("Invalid choice!")
+				except ValueError:
+					print("Wrong data input!")
+
+	def get_user_input(self, operation, num_entries):
+		"""Get user input based on operation.
+
+		Parameters
+		----------
+		operation : string
+			Operation chosen by user.
+		num_entries : int
+			Number of fetched entries.
+
+		Returns
+		-------
+		choice : string
+			User choice for operation.
+		"""
+		if operation == "copy data from":
+			prompt = f"Select an entry to {operation} (1-{num_entries})\n> "
+		else:
+			prompt = f"Select an entry to {operation} (1-{num_entries}), or 'all':\n> "
+			
+		choice = input(prompt)
+		return choice
 
 	def _close_connections(self):
 		"""Close all database connections.
@@ -340,3 +356,15 @@ class DatabaseHandler:
 			self.connection.close()
 			self.cursor = None
 			self.connection = None
+
+	def close_database(self):
+		"""Check whether the file is encrypted and all connections are closed before exiting.
+		"""
+		self._close_connections()
+
+		if os.path.isfile(STORAGE_DB):
+			self.encryptor.encrypt()
+			os.remove(STORAGE_DB)
+
+		print("Terminating script...")
+		sys.exit()

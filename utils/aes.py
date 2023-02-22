@@ -2,15 +2,14 @@ import os
 import struct
 import hashlib
 
-from Crypto.Cipher import AES
+import pyAesCrypt
 
 from .constants import *
 
 class AESCipher:
 	def __init__(self):
 		self._key = None
-		self.chunk_size = 64 * 1024
-		self.file = STORAGE_DB
+		self.buff = 64 * 1024
 
 	@property
 	def key(self):
@@ -18,58 +17,34 @@ class AESCipher:
 
 	@key.setter
 	def key(self, master_key):
-		self._key = hashlib.sha256(master_key.encode()).digest()
+		self._key = master_key
 
 	def encrypt(self):
-		"""Encrypt chosen database.
+		try:
+			if os.path.isfile(STORAGE_DB):
+				with open(STORAGE_DB, "rb") as inp:
+					if not os.path.isfile(f"{STORAGE_DB}.aes"):
+						mode = "wb"
+					else:
+						mode = "ab"
+					with open(f"{STORAGE_DB}.aes", mode) as out:
+						pyAesCrypt.encryptStream(inp, out, self._key, self.buff)
+				os.remove(STORAGE_DB)
+		except Exception as e:
+			print(e)
 
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		None
-		"""
-		iv = os.urandom(16)
-		encryptor = AES.new(self._key, AES.MODE_CBC, iv)
-		file_size = os.path.getsize(self.file)
-
-		with open(self.file, "rb") as inp:
-			with open(f"{self.file}.enc", "wb") as out:
-				out.write(struct.pack("<Q", file_size))
-				out.write(iv)
-
-				while True:
-					chunk = inp.read(self.chunk_size)
-					if not chunk:
-						break
-					elif len(chunk) % 16 != 0:
-						chunk += b" " * (16 - len(chunk) % 16)
-					out.write(encryptor.encrypt(chunk))
-		os.remove(self.file)
 
 	def decrypt(self):
-		"""Decrypt chosen database.
+		if os.path.isfile(f"{STORAGE_DB}.aes"):
+			file_size = os.stat(f"{STORAGE_DB}.aes").st_size
+		else:
+			file_size = 0
 
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		None
-		"""
-		with open(f"{self.file}.enc", "rb") as inp:
-			size = struct.unpack("<Q", inp.read(struct.calcsize("Q")))[0]
-			iv = inp.read(16)
-			decryptor = AES.new(self._key, AES.MODE_CBC, iv)
-
-			with open(self.file, "wb") as out:
-				while True:
-					chunk = inp.read(self.chunk_size)
-					if not chunk:
-						break
-					out.write(decryptor.decrypt(chunk))
-				out.truncate(size)
-		os.remove(f"{self.file}.enc")
+		try:
+			if os.path.isfile(f"{STORAGE_DB}.aes"):
+				with open(f"{STORAGE_DB}.aes", "rb") as inp:
+					with open(STORAGE_DB, "ab") as out:
+						pyAesCrypt.decryptStream(inp, out, self._key, self.buff, file_size)
+				os.remove(f"{STORAGE_DB}.aes")
+		except Exception as e:
+			print(e)

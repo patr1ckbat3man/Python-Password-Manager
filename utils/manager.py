@@ -28,6 +28,8 @@ class PasswordManager:
 			if self.datamanip.handle_key(master_key, verify=True):
 				self.encryptor.key = master_key
 				self.prompt_menu()
+			else:
+				print("You have either entered incorrect password or the database is corrupt.")
 
 	def change(self):
 		new_key = getpass.getpass("Enter new master key: ")
@@ -36,28 +38,15 @@ class PasswordManager:
 			print("Master key succesfully changed.")
 			self.prompt_menu()
 
-	def close_database(self):
-		"""Check whether the file is encrypted and all connections are closed before exiting.
-		"""
-		if os.path.isfile(STORAGE_DB) and os.path.getsize(STORAGE_DB) > 0:
-			if not self.encrypted:
-				self.encryptor.encrypt()
-				self.encrypted = True
-		else:
-			self.encrypted = False
-		self._close_connections()
-		print("Exiting...")
-		sys.exit()
-
 	def prompt_menu(self):
 		actions = {
-			1: lambda: self.datamanip.add_entry(),
+			1: lambda: self.datamanip.handle_database(add=True),
 			2: lambda: self.datamanip.display_entry(),
-			3: lambda: self.datamanip.update_entry(),
-			4: lambda: self.datamanip.delete_entry(),
+			3: lambda: self.datamanip.handle_database(update=True),
+			4: lambda: self.datamanip.handle_database(delete=True),
 			5: lambda: self.change(),
-			6: lambda: sys.exit(),
-			"default": lambda: print("Wrong choice! Try again.")
+			6: lambda: self.on_close(),
+			"default": lambda: os.system("cls||clear")
 		}
 
 		print("1 - Add entry")
@@ -73,5 +62,9 @@ class PasswordManager:
 			action()
 			self.prompt_menu()
 		except ValueError:
+			os.system("cls||clear")
 			print("Wrong data input! Try again.")
 			self.prompt_menu()
+
+	def on_close(self):
+		self.datamanip.close_database()
