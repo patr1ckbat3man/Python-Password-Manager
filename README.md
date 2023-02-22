@@ -1,5 +1,3 @@
-# Vault
-A password manager that runs on your computer, allowing you to access your passwords and other sensitive information without an internet connection.
 ## Installation
 Install dependencies:
 ```bash
@@ -16,7 +14,17 @@ Run the application:
 ```bash
 python3 main.py
 ```
+## Authentication
+```python3
+key_hash = self.cursor.execute("select hash from user;").fetchone()[0]
+if bcrypt.checkpw(key.encode(), key_hash):
+    return True
+else:
+    return False
+```
 ## Vulnerabilities
-If a attacker gets access to the JSON file where the user's password hash is kept or the encrypted database file, it's not a huge deal. But if either of these files gets deleted, all the stored data will be gone for good and most likely can't be recovered.
-## License
-MIT
+If an attacker gets access to the database file where the user's password hash is kept or the encrypted database file, it's not a huge deal. But if either of these files gets deleted, all the stored data will be gone for good and most likely can't be recovered.
+## Performance
+This manager is not efficient at all because the database is decrypted and encrypted everytime an operation is executed. This is because I didn't want to leave the database file decrypted during the whole time the app is running, even though it doesn't really matter because the database is decrypted the whole time any operation is getting executed by user.
+## Disclaimer
+I strongly advise you to not use this as your actual password manager and use something that is maintained properly and up to all security standars like KeepassXC. This was just a small project.
