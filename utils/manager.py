@@ -63,7 +63,6 @@ class PasswordManager:
 			self.prompt_menu()
 		except ValueError:
 			os.system("cls||clear")
-			print("Wrong data input! Try again.")
 			self.prompt_menu()
 
 	def on_close(self):

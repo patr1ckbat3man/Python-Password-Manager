@@ -33,7 +33,7 @@ class DatabaseHandler:
 
 		Parameters
 		----------
-		key : utf-8 encoded string
+		key : utf-8 encoded str
 			Master key of user.
 
 		**kwargs : dict
@@ -81,24 +81,26 @@ class DatabaseHandler:
 		"""
 		column, value = self.prompt_filter()
 		entries = self.fetch_entries(column, value)
+		if not entries:
+			print("No entries found!")
+			return
 		processed_entries = self.process_entries(entries, "copy data from")
 
 		if processed_entries:
 			for entry in processed_entries:
-				if isinstance(entry, tuple):
-					entry_id = entry[0]
-					data = input("Which data would you like to copy? (title / username / password / url)\n> ").strip().lower()
-				if data not in ["title", "username", "password", "url"]:
-					print("Wrong choice.")
-					return
-				elif data == "title":
-					pyperclip.copy(entry[1])
-				elif data == "username":
-					pyperclip.copy(entry[2])
-				elif data == "password":
-					pyperclip.copy(entry[3])
-				elif data == "url":
-					pyperclip.copy(entry[4])
+				if not isinstance(entry, tuple):
+					continue
+
+				_, title, username, password, url = entry
+
+				while True:
+					data = input("Which data would you like to copy? (title / username / password / url), or press ENTER\n> ").strip().lower()
+					if data in ["title", "username", "password", "url"]:
+						pyperclip.copy(entry[["title", "username", "password", "url"].index(data) + 1])
+						print(f"{data.capitalize()} copied to clipboard.")
+						break
+					else:
+						print("Invalid choice. Please try again.")
 
 	@update_database
 	def handle_database(self, **kwargs):
@@ -130,6 +132,9 @@ class DatabaseHandler:
 			elif kwargs.get("update"):
 				column, value = self.prompt_filter()
 				entries = self.fetch_entries(column, value)
+				if not entries:
+					print("No entries found!")
+					return
 				processed_entries = self.process_entries(entries, "update")
 
 				if processed_entries:
@@ -144,6 +149,9 @@ class DatabaseHandler:
 			elif kwargs.get("delete"):
 				column, value = self.prompt_filter()
 				entries = self.fetch_entries(column, value)
+				if not entries:
+					print("No entries found!")
+					return
 				processed_entries = self.process_entries(entries, "delete")
 
 				if processed_entries:
@@ -161,48 +169,15 @@ class DatabaseHandler:
 			self._close_connections()
 
 	@update_database
-	def table_empty(self, table_name):
-		"""Check for the table existence in the database.
-
-		Parameters
-		----------
-		table_name : string
-			Name of database table.
-
-		Returns
-		-------
-		bool
-			Boolean indicating whether the table exists.
-		"""
-		try:
-			self.connection = sqlite3.connect(STORAGE_DB)
-			self.cursor = self.connection.cursor()
-			self.cursor.execute(f"select name from sqlite_master where type='table' and name='{table_name}';")
-			table_exists = self.cursor.fetchall()
-			self.cursor.execute("select count(*) from storage;")
-			row_count = self.cursor.fetchall()
-			if not table_exists:
-				if row_count[0][0] == 0:
-					print("No data to query! Add some entries first.")
-					return True
-				else:
-					return False
-			else:
-				return False
-		except sqlite3.Error as e:
-			print(e)
-			return False
-
-	@update_database
 	def fetch_entries(self, filter_by, value):
 		"""Fetch all entries if they exist.
 
 		Parameters
 		----------
-		filter_by : string
+		filter_by : str
 			Name of column which is gonna be filtered.
 
-		value : string
+		value : str
 			Value to be searched for in filtered column.
 
 		Returns
@@ -221,8 +196,9 @@ class DatabaseHandler:
 				return result
 			else:
 				return False
-		except sqlite3.Error as e:
-			print(e)
+		except sqlite3.Error:
+			print("Table doesn't exist yet. Add some entries first.")
+			return
 
 	def process_entries(self, entries, operation):
 		"""Process fetched entries.
@@ -231,27 +207,27 @@ class DatabaseHandler:
 		----------
 		entries : list
 			List of fetched entries.
-		operation : string
+		operation : str
 			Operation chosen by user.
 
 		Returns
 		-------
 		entries : tuple
 			Tuple containing arrays for each processed entry.		
-		"""
-		if not entries:
-			print("No entries found.")
-			return
-
+		"""	
 		print("------------------------------------------------------------")
 		print(f"Found {len(entries)} matching entry/entries:")
-		print("<choice> - (ID, Title, Username, Password, URL)")
 		for idx, entry in enumerate(entries):
-			print(f"{idx+1} - {entry}")
+			entry_id, title, username, password, url = entry
+			print(f"{idx+1}")
+			print(f"Title: {title}")
+			print(f"Username: {username}")
+			print(f"Password: {password}")
+			print(f"URL: {url}")
 		print("------------------------------------------------------------")
 
 		if len(entries) == 1:
-			choice = input(f"Select an entry to {operation}:\n> ")
+			choice = input(f"Select an entry to {operation}, or press ENTER\n> ")
 			index = int(choice) - 1
 			return [entries[index]]
 		else:
@@ -264,12 +240,12 @@ class DatabaseHandler:
 					if index >= 0 and index < len(entries):
 						return [entries[index]]
 					else:
-						print("Invalid choice!")
+						print("Invalid choice of entry.")
 				except ValueError:
-					print("Wrong data input!")
+					print("Wrong data input.")
 
 	def prompt_data(self):
-		"""Display choices of data to be entered into entry.
+		"""Prompts the user to enter data for a new entry.
 
 		Parameters
 		----------
@@ -277,21 +253,24 @@ class DatabaseHandler:
 
 		Returns
 		-------
-		title : str
-		username : str
-		password : str
-		url : str
+		tuple
+			A tuple containing the title, username, password, and URL.
 		"""
-		title = str(input("Title: (Mandatory)\n> "))
-		if not title:
+		title = input("Title: (Mandatory)\n> ").strip()
+		while not title:
 			print("Title has to be filled in.")
-			self.prompt_data()
-		username = str(input("Username: (If none, leave empty)\n> "))
-		password = getpass.getpass("Password: (Mandatory)\n> ")
-		if not password:
-			print("Password field has to be filled in.")
-			self.prompt_data()
-		url = str(input("URL: (If none, leave empty)\n> "))
+			title = input("Title: (Mandatory)\n> ").strip()
+
+		username = input("Username: (If none, leave empty)\n> ").strip()
+
+		password = None
+		while not password:
+			password = getpass.getpass("Password: (Mandatory)\n> ")
+			if not password:
+				print("Password field has to be filled in.")
+
+		url = input("URL: (If none, leave empty)\n> ").strip()
+
 		return title, username, password, url
 
 	def prompt_filter(self):
@@ -316,7 +295,7 @@ class DatabaseHandler:
 
 		column = input("Filter by (t=Title / u=Username / r=URL):\n> ").strip().lower()
 		if column not in filter_options:
-			print("Wrong filter specified! Try again.")
+			print("Wrong filter specified.")
 			return self.prompt_filter()
 
 		column_filter = filter_options[column]
@@ -329,14 +308,14 @@ class DatabaseHandler:
 
 		Parameters
 		----------
-		operation : string
+		operation : str
 			Operation chosen by user.
 		num_entries : int
 			Number of fetched entries.
 
 		Returns
 		-------
-		choice : string
+		choice : str
 			User choice for operation.
 		"""
 		if operation == "copy data from":
