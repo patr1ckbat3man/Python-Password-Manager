@@ -1,6 +1,4 @@
 import os
-import struct
-import hashlib
 
 import pyAesCrypt
 
