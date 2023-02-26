@@ -1,11 +1,11 @@
 import os
 import sys
 import sqlite3
-import getpass
 
 import pyperclip
 import bcrypt
 
+from .prompts import *
 from .constants import *
 
 class DatabaseHandler:
@@ -79,7 +79,7 @@ class DatabaseHandler:
 	def display_entry(self):
 		"""Display filtered entries.
 		"""
-		column, value = self.prompt_filter()
+		column, value = get_filter()
 		entries = self.fetch_entries(column, value)
 		if not entries:
 			print("No entries found!")
@@ -123,14 +123,14 @@ class DatabaseHandler:
 				if not os.path.exists(STORAGE_DB):
 					open(STORAGE_DB, "a").close()
 
-				ttl, usr, psw, url = self.prompt_data()
+				ttl, usr, psw, url = get_data()
 
 				self.cursor.execute("create table if not exists storage(id INTEGER PRIMARY KEY, title TEXT, username TEXT, password TEXT, url TEXT);")
 				self.cursor.execute("insert into storage (title, username, password, url) values (?, ?, ?, ?);", (ttl, usr, psw, url))
 				self.connection.commit()
 				print("Entry succesfully added.")
 			elif kwargs.get("update"):
-				column, value = self.prompt_filter()
+				column, value = get_filter()
 				entries = self.fetch_entries(column, value)
 				if not entries:
 					print("No entries found!")
@@ -142,12 +142,12 @@ class DatabaseHandler:
 						if isinstance(entry, tuple):
 							entry_id = entry[0]
 							print(f"Updating values for: {entry}")
-							ttl, usr, psw, url = self.prompt_data()
+							ttl, usr, psw, url = get_data()
 							self.cursor.execute("update storage set title=?, username=?, password=?, url=? where id=?;", (ttl, usr, psw, url, entry_id,))
 					self.connection.commit()
 					print(f"Updated {len(processed_entries)} entry/entries.")
 			elif kwargs.get("delete"):
-				column, value = self.prompt_filter()
+				column, value = get_filter()
 				entries = self.fetch_entries(column, value)
 				if not entries:
 					print("No entries found!")
@@ -231,7 +231,7 @@ class DatabaseHandler:
 			index = int(choice) - 1
 			return [entries[index]]
 		else:
-			choice = self.prompt_entry(operation, len(entries))
+			choice = get_entry(operation, len(entries))
 			if choice == "all":
 				return entries
 			else:
@@ -243,88 +243,6 @@ class DatabaseHandler:
 						print("Invalid choice of entry.")
 				except ValueError:
 					print("Wrong data input.")
-
-	def prompt_data(self):
-		"""Prompts the user to enter data for a new entry.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		tuple
-			A tuple containing the title, username, password, and URL.
-		"""
-		title = input("Title: (Mandatory)\n> ").strip()
-		while not title:
-			print("Title has to be filled in.")
-			title = input("Title: (Mandatory)\n> ").strip()
-
-		username = input("Username: (If none, leave empty)\n> ").strip()
-
-		password = None
-		while not password:
-			password = getpass.getpass("Password: (Mandatory)\n> ")
-			if not password:
-				print("Password field has to be filled in.")
-
-		url = input("URL: (If none, leave empty)\n> ").strip()
-
-		return title, username, password, url
-
-	def prompt_filter(self):
-		"""Display choices for filters.
-
-		Parameters
-		----------
-		None
-
-		Returns
-		-------
-		column_filter : str
-			Name of column which is gonna be filtered.
-		value : str
-			Value to be searched for in filtered column.
-		"""
-		filter_options = {
-			"t": "title",
-			"u": "username",
-			"r": "url"
-		}
-
-		column = input("Filter by (t=Title / u=Username / r=URL):\n> ").strip().lower()
-		if column not in filter_options:
-			print("Wrong filter specified.")
-			return self.prompt_filter()
-
-		column_filter = filter_options[column]
-		value = input(f"Value to search for in {column_filter} column:\n> ").strip().lower()
-
-		return column_filter, value
-
-	def prompt_entry(self, operation, num_entries):
-		"""Get user input based on operation.
-
-		Parameters
-		----------
-		operation : str
-			Operation chosen by user.
-		num_entries : int
-			Number of fetched entries.
-
-		Returns
-		-------
-		choice : str
-			User choice for operation.
-		"""
-		if operation == "copy data from":
-			prompt = f"Select an entry to {operation} (1-{num_entries})\n> "
-		else:
-			prompt = f"Select an entry to {operation} (1-{num_entries}), or 'all':\n> "
-			
-		choice = input(prompt)
-		return choice
 
 	def _close_connections(self):
 		"""Close all database connections.
